@@ -35,12 +35,13 @@ export function defineSubscribe(config: Config) {
 
     const now = Date.now()
     if (!force) {
+      // 5分钟内检查过了
+      if (now - sub.checkedAt < 1000 * 60 * 5) return
+
       // 15天内没有更新过的跳过
       if (sub.checkedAt - sub.updatedAt > 1000 * 60 * 60 * 24 * 15) return
       // 近6天内更新过了
       if (now - sub.updatedAt < 1000 * 60 * 60 * 24 * 6) return
-      // 5分钟内检查过了
-      if (now - sub.checkedAt < 1000 * 60 * 5) return
     }
 
     const animeInfo = await config.subscribe.getAnimeInfo(id, sm)
@@ -95,7 +96,7 @@ export function defineSubscribe(config: Config) {
     const id = config.subscribe.getId()
 
     stopSyncSubscribeBtn?.()
-    stopSyncSubscribeBtn = sm.onChange(
+    const stopSync = sm.onChange(
       () => {
         const sub = sm.getSubscription(id)
         $btn.html(`
@@ -105,6 +106,7 @@ export function defineSubscribe(config: Config) {
       },
       { immediate: true }
     )
+    stopSyncSubscribeBtn = stopSync
 
     $btn.on('click', async () => {
       $btn.text('处理中...')
@@ -119,6 +121,14 @@ export function defineSubscribe(config: Config) {
     })
 
     config.subscribe.renderSubscribeBtn($btn, sm)
+
+    return () => {
+      stopSync()
+      $btn.off()
+      if (stopSyncSubscribeBtn === stopSync) {
+        stopSyncSubscribeBtn = undefined
+      }
+    }
   }
 
   return {

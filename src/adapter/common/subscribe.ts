@@ -32,8 +32,14 @@ function trimUrlOrigin(url: string) {
 
 function normalizeSubscription(sub: SubscribedAnime): SubscribedAnime {
   return {
-    ...sub,
+    id: sub.id,
+    title: sub.title,
     url: trimUrlOrigin(sub.url),
+    thumbnail: sub.thumbnail,
+    status: sub.status,
+    createdAt: sub.createdAt,
+    updatedAt: sub.updatedAt,
+    checkedAt: sub.checkedAt,
     current: { ...sub.current, url: trimUrlOrigin(sub.current.url) },
     last: { ...sub.last, url: trimUrlOrigin(sub.last.url) },
   }
