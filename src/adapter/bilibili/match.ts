@@ -122,6 +122,7 @@ const BRACKET_PAIRS: [string, string][] = [
   ['<', '>'],
   ['『', '』'],
   ['「', '」'],
+  ['〖', '〗'],
 ]
 
 /**
@@ -239,9 +240,11 @@ export function splitCompoundTitle(
   // 括号里的才是番名本体（『花织同学…』），括号外的修饰（字幕组、画质）
   // 通常在括号外。先把括号字符换空格再挑最长的一段当番名。
   series = stripBracketChars(series)
-  const parts = segments(series)
-  if (parts.length) {
-    series = parts.reduce((a, b) => (b.length > a.length ? b : a))
+  if (marks.length > 1) {
+    const parts = segments(series)
+    if (parts.length) {
+      series = parts.reduce((a, b) => (b.length > a.length ? b : a))
+    }
   }
 
   series = series.trim()
@@ -688,6 +691,26 @@ export function rememberedAnime(
   if (!stored) return undefined
   const hit = animes.find((o) => sameId(o.id, stored.id))
   return hit
+}
+
+/**
+ * 直接读取用户之前手动确认过的番剧。
+ *
+ * 不能只在本轮搜索结果里查记忆：页面标题可能每次清洗结果略有不同，
+ * 甚至这次搜索直接没有结果；这两种情况都会让原来的 rememberedAnime
+ * 失去机会。先按原 key，再按归一化后的系列名找回手动映射。
+ */
+export function rememberedAnimeFor(seriesName: string): AnimeItem | undefined {
+  const direct = storageAnimeName(seriesName)
+  if (direct) return { id: String(direct.id), name: String(direct.name) }
+
+  const target = normalizeName(seriesName)
+  if (!target) return undefined
+  const hit = storageAnimeName.entries().find(([key, value]) => {
+    return normalizeName(key) === target || normalizeName(value.keyword || '') === target
+  })
+  if (!hit) return undefined
+  return { id: String(hit[1].id), name: String(hit[1].name) }
 }
 
 function parseEpisodeNumber(episode: string) {

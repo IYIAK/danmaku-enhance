@@ -403,7 +403,18 @@ function readBangumiInfo(): BiliPageInfo | undefined {
 }
 
 function readDomInfo(): BiliPageInfo {
-  const title = document.title || ''
+  const queryMeta = (selector: string) => {
+    const query = (document as Document & {
+      querySelector?: (value: string) => Element | null
+    }).querySelector
+    return typeof query === 'function'
+      ? query.call(document, selector)?.getAttribute('content') || ''
+      : ''
+  }
+  const title =
+    document.title ||
+    queryMeta('meta[property="og:title"]') ||
+    queryMeta('meta[name="title"]')
 
   // 「转发合集」式复合标题优先：【A】第8集『B』第7话 —— 第一个集数属于
   // 原作 A，真正在播的是『B』；取最后一个标记的番名与集数。DOM 里的

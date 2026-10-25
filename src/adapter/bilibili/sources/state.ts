@@ -31,6 +31,8 @@ let entries: UrlSourceEntry[] = []
  * 当前页面标识。URL 来源按页面分开存：在 A 视频上加的来源不该出现在 B 视频里。
  */
 let pageKey = ''
+/** 页面切换代数；丢弃跨页面完成的异步解析和拉取结果 */
+let pageGeneration = 0
 const listeners = new Set<() => void>()
 /** 每条来源的加载序号，用来丢弃过期的回调 */
 const loadSeq = new Map<string, number>()
@@ -78,7 +80,13 @@ export function setOffset(key: string, offsetSec: number) {
 }
 
 /** 解析 URL 并加入列表；同一集不重复添加，只重新拉取 */
-export async function addSource(rawUrl: string): Promise<UrlSourceEntry> {
+export async function addSource(
+  rawUrl: string,
+  expectedGeneration = pageGeneration
+): Promise<UrlSourceEntry> {
+  if (expectedGeneration !== pageGeneration) {
+    throw new Error('页面已切换，放弃恢复旧来源')
+  }
   let url: URL
   try {
     url = new URL(rawUrl.trim())
@@ -92,6 +100,9 @@ export async function addSource(rawUrl: string): Promise<UrlSourceEntry> {
   }
 
   const series = await source.resolve(url)
+  if (expectedGeneration !== pageGeneration) {
+    throw new Error('页面已切换，放弃恢复旧来源')
+  }
   if (!series.episodes.length) {
     throw new Error('没有解析到可用的分集')
   }
@@ -102,7 +113,7 @@ export async function addSource(rawUrl: string): Promise<UrlSourceEntry> {
   const existing = entries.find((e) => e.key === key)
   if (existing) {
     existing.url = rawUrl.trim()
-    await loadEntry(existing, source)
+    await loadEntry(existing, source, expectedGeneration)
     return existing
   }
 
@@ -125,7 +136,7 @@ export async function addSource(rawUrl: string): Promise<UrlSourceEntry> {
   entries = [...entries, entry]
   persist()
   notify()
-  await loadEntry(entry, source)
+  await loadEntry(entry, source, expectedGeneration)
   return entry
 }
 
@@ -142,7 +153,12 @@ export function clearSources() {
 }
 
 /** 加载某一来源；失败只影响这条 */
-async function loadEntry(entry: UrlSourceEntry, source: UrlSource) {
+async function loadEntry(
+  entry: UrlSourceEntry,
+  source: UrlSource,
+  expectedGeneration = pageGeneration
+) {
+  if (expectedGeneration !== pageGeneration) return
   const mine = (loadSeq.get(entry.key) || 0) + 1
   loadSeq.set(entry.key, mine)
 
@@ -154,20 +170,20 @@ async function loadEntry(entry: UrlSourceEntry, source: UrlSource) {
 
   try {
     const items = await source.load(entry.episode, (msg) => {
-      if (loadSeq.get(entry.key) !== mine) return
+      if (expectedGeneration !== pageGeneration || loadSeq.get(entry.key) !== mine) return
       entry.progress = msg
       notify()
     })
-    if (loadSeq.get(entry.key) !== mine) return
+    if (expectedGeneration !== pageGeneration || loadSeq.get(entry.key) !== mine) return
     entry.items = items
     entry.progress = items.length ? `共 ${items.length} 条` : '这一集没有弹幕'
   } catch (error) {
-    if (loadSeq.get(entry.key) !== mine) return
+    if (expectedGeneration !== pageGeneration || loadSeq.get(entry.key) !== mine) return
     entry.items = []
     entry.error = (error as Error)?.message || String(error)
     entry.progress = ''
   } finally {
-    if (loadSeq.get(entry.key) === mine) {
+    if (expectedGeneration === pageGeneration && loadSeq.get(entry.key) === mine) {
       entry.loading = false
       notify()
     }
@@ -184,6 +200,7 @@ function persist() {
 /** 切换页面时先设好 pageKey，再 restoreSources() */
 export function setPageKey(next: string) {
   if (next === pageKey) return
+  pageGeneration++
   pageKey = next
   entries = []
   loadSeq.clear()
@@ -196,20 +213,37 @@ export function getPageKey() {
 
 /** 切换到新页面/新分集时清空内存状态（持久化列表保留） */
 export function resetUrlSources() {
+  pageGeneration++
   loadSeq.clear()
   entries = []
   notify()
 }
 
-/** 从持久化恢复**当前页面**上次使用的来源 */
-export async function restoreSources() {
-  const saved = loadSources(pageKey)
+/**
+ * 从持久化恢复**当前页面**上次使用的来源。
+ *
+ * 页面信息刚加载时可能只有 `vid:*`，稍后才补出 `cid:*`；调用方把旧 key
+ * 作为 fallbackKeys 传进来，避免同一个页面因为识别时序不同而丢来源。
+ * 成功恢复后 persist() 会把来源写到当前 key，完成迁移。
+ */
+export async function restoreSources(fallbackKeys: string[] = []) {
+  const keys = [pageKey, ...fallbackKeys].filter(
+    (key, index, list) => key && list.indexOf(key) === index
+  )
+  const savedByUrl = new Map<string, { url: string; offsetMs: number }>()
+  for (const key of keys) {
+    for (const item of loadSources(key)) {
+      if (!savedByUrl.has(item.url)) savedByUrl.set(item.url, item)
+    }
+  }
+  const saved = [...savedByUrl.values()]
   if (!saved.length) return
   const mine = pageKey
+  const generation = pageGeneration
 
   for (const item of saved.slice(0, MAX_SOURCES)) {
     try {
-      const entry = await addSource(item.url)
+      const entry = await addSource(item.url, generation)
       if (entry && item.offsetMs) {
         entry.offsetMs = item.offsetMs
         notify()
@@ -218,7 +252,7 @@ export async function restoreSources() {
       console.warn('[danmaku-enhance] 恢复 URL 来源失败', item.url, error)
     }
     // 期间切了页面就别继续往旧列表里塞了
-    if (mine !== pageKey) return
+    if (mine !== pageKey || generation !== pageGeneration) return
   }
 }
 

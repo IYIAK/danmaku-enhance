@@ -644,12 +644,19 @@ function buildInjections(
   // 合并要求按时间有序，两路来源各自有序但拼起来不一定
   candidates.sort((a, b) => a.timeMs - b.timeMs)
 
+  // 没有候选时只把当前播放窗口记为 missed。播放器打开弹幕列表时会预取
+  // 其它分段，那些分段没有第三方弹幕并不代表当前播放段已经被缓存；如果
+  // 也计入 missed，面板会误报「当前段已缓存，刷新生效」。
+  const now = playbackMs()
+  const ahead = now >= 0 && request.startMs > now + 30 * 1000
+  const behind = now >= 0 && request.endMs < now - 60 * 1000
+
   // 即使一个候选都没有也要继续：过滤器要作用在原生弹幕上，
   // 「没有第三方弹幕」不等于「这段响应不用改」。
   state.stats.available = candidates.length
   // 这一帧一条候选都没有 = 这一段是在我们准备好之前就被取走的，
   // 播放器不会重发，只能刷新页面。面板据此提示「本段已缓存，刷新生效」。
-  if (!candidates.length) state.stats.missed++
+  if (!candidates.length && !ahead && !behind) state.stats.missed++
   const result = pickComments(candidates, request, bytes, loadFilter())
   if (result.filtered) state.stats.filtered += result.filtered
   if (result.merged) state.stats.merged += result.merged
@@ -662,9 +669,6 @@ function buildInjections(
     }
     // 打开右侧弹幕列表会一次性预取全部分段，那些段落在播放位置之外，
     // 本来就没有候选弹幕，不该显示成「全被丢弃」。
-    const now = playbackMs()
-    const ahead = now >= 0 && request.startMs > now + 30 * 1000
-    const behind = now >= 0 && request.endMs < now - 60 * 1000
     if (ahead || behind) {
       return detail(
         `预取段（当前播放 ${Math.round(now / 1000)}s，本段 ${Math.round(
@@ -1184,6 +1188,12 @@ function patchXHR(target?: any): boolean {
     url: string | URL,
     ...rest: unknown[]
   ) {
+    // 播放器可能复用同一个 XHR 实例；每次 open 都必须丢掉上一次请求的
+    // 回调、合并结果和 aborted/read 标记，否则会把旧响应带到新分段。
+    this.__kdCallbacks = undefined
+    this.__kdAborted = false
+    this.__kdMerged = undefined
+    this.__kdRead = false
     try {
       const href = typeof url === 'string' ? url : url.href
       this.__kdUrl = new URL(href, location.href).href

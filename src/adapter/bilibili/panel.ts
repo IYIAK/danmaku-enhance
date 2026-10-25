@@ -41,6 +41,7 @@ import {
   manualSearch,
   rememberMatch,
   rememberedAnime,
+  rememberedAnimeFor,
   squash,
 } from './match'
 import type { AnimeItem, EpisodeItem } from './match'
@@ -186,6 +187,11 @@ function pageKeyOf(info: BiliPageInfo) {
   return `${info.seriesName || ''}#${info.episode ?? ''}`
 }
 
+/** 页面尚未拿到 cid 时使用的持久化 key；用于恢复旧 key 下的 URL 来源。 */
+function vidPageKeyOf(info: BiliPageInfo, bvid = readBvid()) {
+  return bvid ? `vid:${bvid}#${info.episode ?? ''}` : ''
+}
+
 export function mountPanel(info: BiliPageInfo): PanelHandle {
   const config: BiliConfig = loadConfig()
 
@@ -315,8 +321,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   const urlInput = el('input', `${ROOT_CLASS}__input`) as HTMLInputElement
   urlInput.type = 'text'
   urlInput.placeholder = '粘贴 B站 / 巴哈姆特 视频链接'
+  const urlPasteBtn = el('button', `${ROOT_CLASS}__mini`, '粘贴')
   const urlAddBtn = el('button', `${ROOT_CLASS}__mini`, '添加')
-  urlInputRow.append(urlInput, urlAddBtn)
+  urlInputRow.append(urlInput, urlPasteBtn, urlAddBtn)
 
   const urlList = el('div', `${ROOT_CLASS}__list`)
   const urlTip = el('div', `${ROOT_CLASS}__tip`)
@@ -363,8 +370,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   const whitelistInput = el('input', `${ROOT_CLASS}__input`) as HTMLInputElement
   whitelistInput.type = 'text'
   whitelistInput.placeholder = 'UP 主 UID 或主页链接'
+  const whitelistPasteBtn = el('button', `${ROOT_CLASS}__mini`, '粘贴')
   const whitelistAddBtn = el('button', `${ROOT_CLASS}__mini`, '添加')
-  whitelistRow.append(whitelistInput, whitelistAddBtn)
+  whitelistRow.append(whitelistInput, whitelistPasteBtn, whitelistAddBtn)
 
   const whitelistSelfBtn = el('button', `${ROOT_CLASS}__minor`)
   whitelistSelfBtn.type = 'button'
@@ -1015,33 +1023,40 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     return !!anime && !!episode
   }
 
+  function pauseVideoIfNeeded() {
+    if (!forced || userStarted) return
+    const video = findOne<HTMLVideoElement>(['video'])
+    if (!video || video.paused) return
+    pausedByUs = true
+    try {
+      video.pause()
+    } catch {
+      pausedByUs = false
+    }
+  }
+
   function tickPause() {
     if (!forced || detached) return
-    // 能放弹幕了就别按了：成功由 pickEpisode 的 resumeIfWePaused 负责恢复播放
-    if (matchReady()) return
     // 匹配已经有结论（成功/失败/要人选都算）：文案由 settleForced、
     // 候选分支负责，监视别再插话——不然 beginForced 同页重入后监视会把
     // 候选分支的「请手动选择番剧名」改写成「未匹配到番剧，请手动选择」，
     // 用户看到 toast 自己变来变去。
-    if (matchSettled) return
+    // 失败结论也必须继续按住；之前这里直接 return，导致白名单视频在
+    // 「未匹配到番剧」toast 出现后又自动播放。
+    if (matchSettled) {
+      pauseVideoIfNeeded()
+      return
+    }
+    // 能放弹幕了就别按了：成功由 pickEpisode 的 resumeIfWePaused 负责恢复播放
+    if (matchReady()) return
     // 用户自己动过播放器 = 他不想等，让位
     if (userStarted) {
       releaseHold()
       return
     }
-    const video = findOne<HTMLVideoElement>(['video'])
-    if (!video) return
-
     // 暂停和提示一起做，每一轮都跑：文案随匹配进展变化（同 key 会就地更新，
     // 不会堆成一片），这样「为什么停住」始终是屏幕上最新的那一句。
-    if (!video.paused) {
-      pausedByUs = true
-      try {
-        video.pause()
-      } catch {
-        pausedByUs = false
-      }
-    }
+    pauseVideoIfNeeded()
     const reason = matchSettled
       ? anime
         ? `已匹配「${anime.name}」，请手动选择集数`
@@ -1114,6 +1129,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   function settleForced(reason: string) {
     giveUpHold()
     if (!forced) return
+    pauseVideoIfNeeded()
     // 同一条原因不重复弹（下拉框点几次就会走几次这里）
     if (reason === lastHoldReason) return
     lastHoldReason = reason
@@ -1167,6 +1183,22 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     addWhitelistByMid(mid)
     whitelistInput.value = ''
   })
+  whitelistPasteBtn.addEventListener('click', async () => {
+    whitelistTip.classList.remove('is-error')
+    try {
+      if (!navigator.clipboard?.readText) throw new Error('clipboard-unavailable')
+      const text = (await navigator.clipboard.readText()).trim()
+      if (!text) {
+        whitelistTip.textContent = '剪贴板为空'
+        return
+      }
+      whitelistInput.value = text
+      whitelistInput.focus()
+    } catch {
+      whitelistTip.textContent = '浏览器未授予剪贴板权限，请使用 Ctrl+V'
+      whitelistTip.classList.add('is-error')
+    }
+  })
   whitelistInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') whitelistAddBtn.click()
   })
@@ -1210,6 +1242,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   let busy = false
   /** 这一轮匹配已经有结论了（成功或失败都算），白名单的暂停监视靠它收手 */
   let matchSettled = false
+  /** 当前集弹弹play无弹幕时，已经用 URL 来源接管到的条数 */
+  let urlFallbackCount = 0
+  /** URL 来源加入时播放器已经请求过弹幕，需要提醒刷新当前分段 */
+  let urlFallbackNeedsRefresh = false
   let reloadHint = ''
   let reloading = false
   // 匹配序号：每重置一次就 +1，异步链路在每个 await 之后核对。
@@ -1227,6 +1263,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     episodeOptions = []
     tried = []
     notice = nextNotice
+    urlFallbackCount = 0
+    urlFallbackNeedsRefresh = false
     setComments(null)
   }
 
@@ -1290,6 +1328,15 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       debugBox.textContent = ''
       return
     }
+    if (urlFallbackCount > 0 && notice) {
+      statusMain.textContent = notice
+      statusSub.textContent = urlFallbackNeedsRefresh
+        ? '当前分段可能已缓存，刷新后生效'
+        : '后续分段会自动生效'
+      pageReloadBtn.hidden = !urlFallbackNeedsRefresh
+      debugBox.textContent = debugLine(stats)
+      return
+    }
     if (busy && notice) {
       statusMain.textContent = notice
       statusSub.textContent = ''
@@ -1324,7 +1371,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         pageReloadBtn.hidden = false
       } else if (stats.injected > 0) {
         statusSub.textContent = stats.available
-          ? `本次共 ${stats.available} 条，已注入 ${stats.injected} 条${
+          ? `共 ${stats.available} 条，当前分段已注入 ${stats.injected} 条${
               extra ? `（${extra}）` : ''
             }`
           : `已注入 ${stats.injected} 条（${stats.segments} 段）${
@@ -1510,6 +1557,35 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     })
   }
 
+  /**
+   * 弹弹play明确返回空集时，URL来源可以作为本集的弹幕结果。
+   *
+   * URL来源的加载是异步的，可能早于或晚于 pickEpisode() 得到空结果，
+   * 所以这个函数既在两条路径上调用，也按总条数去重。白名单视频原本会
+   * 因为「该集没有弹幕」保持暂停；URL源有数据后应按匹配成功处理，放行
+   * 已扣留的响应、恢复播放，并让当前分段重新探测。
+   */
+  function applyUrlFallback(): boolean {
+    if (detached || !config.enabled) return false
+    const comments = getComments()
+    const total = getTotalCount()
+    if (!comments || comments.length > 0 || total <= 0) return false
+    if (total === urlFallbackCount) return true
+
+    urlFallbackCount = total
+    urlFallbackNeedsRefresh = getStats().requests > 0
+    busy = false
+    matchSettled = true
+    notice = `URL来源已加载 ${total} 条弹幕`
+    releaseHold()
+    clearToast('hold')
+    clearToast('hold-tip')
+    showToast(notice, { key: 'count', duration: 4000 })
+    resumeIfWePaused()
+    reloadDanmaku()
+    return true
+  }
+
   async function ensureMatch() {
     if (!config.enabled) return
     // 先登记「马上要匹配」，再去干那些耗时的事（读页面信息、恢复 URL 源、一次网络往返）。
@@ -1525,6 +1601,16 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       try {
         const keyword = cleanTitle(currentInfo.seriesName)
         if (!keyword) throw new MatchError('未识别到当前视频的标题')
+
+        // 用户手动确认过的映射优先于重新搜索。搜索接口最多返回 25 条，
+        // 旧标题还可能因为清洗差异直接搜不到；这两种情况都不该让已确认
+        // 的番剧记忆失效。
+        const remembered = rememberedAnimeFor(currentInfo.seriesName)
+        if (remembered) {
+          tried = []
+          await pickAnime(remembered, { silent: true })
+          return
+        }
 
         // 走 6 候选关键词流程：命中即停，比整串搜索更容易命中
         const found = await findAnime(keyword, (msg) => {
@@ -1588,7 +1674,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
           tried = error.context.tried
           candidateList = error.context.animes.slice(0, 8)
           matchTip.textContent =
-            '弹弹play按番剧名子串检索，单次最多返回 25 条且按编号排序、不提供分页；若未命中，可在上方搜索框换用更准确的关键词重试。'
+            '搜索结果由弹弹play返回，未搜到可尝试更换关键词。'
         }
         // 这一轮匹配彻底失败：白名单的暂停监视收手，否则用户会一直瞪着
         // 暂停画面等一个永远不会来的结果。白名单页面还要说清楚为什么
@@ -1691,10 +1777,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         busy = false
         notice = '该集没有弹幕'
         setComments([])
-        // 这一集确实没弹幕：匹配到此为止，弹一句说清原因。
-        // 白名单页面**仍然扣着响应、也不放开暂停**——约定就是「没好结果先别播」，
-        // 用户点播放才会走 onVideoPlay 里的 releaseHold()。
-        settleForced('该集没有弹幕')
+        // URL 来源可能已经先加载完成；有数据就把它当作本集的弹幕结果，
+        // 否则才保留「该集没有弹幕」的白名单暂停结论。
+        if (!applyUrlFallback()) settleForced('该集没有弹幕')
         render()
         return
       }
@@ -1714,10 +1799,14 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         // 重选成功但已注入的分段还按旧集数合并：整集的新数据其实已经就绪，
         // 状态行会显示总数，刷新页面后全部按新集数生效。
         clearToast('hold')
-        showToast(
-          `已切换到「${current.name}」${ep.name}：已注入的分段仍是原集数，刷新页面后生效`,
-          { key: 'hold', duration: 8000 }
-        )
+        showToast(`已切换到「${current.name}」${ep.name}`, {
+          key: 'title',
+          duration: 4000,
+        })
+        showToast('已注入的分段仍是原集数，刷新页面后生效', {
+          key: 'hold',
+          duration: 8000,
+        })
       } else {
         // 匹配成功：左下角弹番剧名 + 条数，不用开面板也知道选对了哪部、有多少条。
         // 条数把已挂上的 URL 来源也算进去，那才是「整集一共有多少条三方弹幕」。
@@ -1766,7 +1855,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         setExpecting(false)
         notice = '未找到匹配番剧'
         matchTip.textContent =
-          '弹弹play按番剧名子串检索，单次最多返回 25 条且按编号排序、不提供分页；未命中不代表数据库没有该作品，可换用更准确的关键词重试。'
+          '搜索结果由弹弹play返回，未搜到可尝试更换关键词。'
         render()
         return
       }
@@ -1803,6 +1892,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     try {
       await addSource(url)
       urlInput.value = ''
+      applyUrlFallback()
     } catch (error) {
       urlTip.textContent = `添加失败：${(error as Error)?.message || error}`
       urlTip.classList.add('is-error')
@@ -1813,7 +1903,25 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     }
   }
 
+  async function onPasteUrl() {
+    urlTip.classList.remove('is-error')
+    try {
+      if (!navigator.clipboard?.readText) throw new Error('clipboard-unavailable')
+      const text = (await navigator.clipboard.readText()).trim()
+      if (!text) {
+        urlTip.textContent = '剪贴板为空'
+        return
+      }
+      urlInput.value = text
+      urlInput.focus()
+    } catch {
+      urlTip.textContent = '浏览器未授予剪贴板权限，请使用 Ctrl+V'
+      urlTip.classList.add('is-error')
+    }
+  }
+
   urlAddBtn.addEventListener('click', () => void onAddUrl())
+  urlPasteBtn.addEventListener('click', () => void onPasteUrl())
   urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') void onAddUrl()
   })
@@ -1821,6 +1929,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   const unsubscribe = subscribe(() => {
     // 加载进度只在面板打开时重绘
     if (opened) renderUrls()
+    applyUrlFallback()
     renderStatus()
   })
 
@@ -1881,6 +1990,13 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   void syncForced()
 
   void (async () => {
+    // 来源可能是在更早一轮用另一种 key 保存的（cid 与 vid key 都保留作
+    // fallback），恢复成功后会自动迁移到当前 canonical key。
+    const restoreKeys = new Set<string>()
+    if (currentPageKey) restoreKeys.add(currentPageKey)
+    const initialVidKey = vidPageKeyOf(info, currentVid)
+    if (initialVidKey) restoreKeys.add(initialVidKey)
+
     // 挂载时先把「这真的属于当前 URL 的那条视频吗」验一遍。
     //
     // runtime 的 run() 在软跳转（点相关推荐）之后可能立刻执行，此时
@@ -1889,25 +2005,42 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     // 「换视频仍然显示上一个视频的结果」——而且因为 currentVid 是在挂载时
     // 读的（已经是新 bvid），checkPage 后面也发现不了差异。
     // 这里在开始匹配之前先按 URL 上的 bvid 问一次接口。
-    if (currentVid && currentInfo.source !== 'video' && currentInfo.source !== 'bangumi') {
+    // 即使 source 已经是 video，只要 key 还是 vid:*，也要继续补 cid；
+    // 否则标题相同的刷新会跳过校正，导致 URL 来源留在旧 key 下。
+    if (currentVid && currentPageKey.startsWith('vid:')) {
       const fresh = await readVideoInfoByBvidAsync(currentVid).catch(() => undefined)
       if (detached) return
-      if (fresh && fresh.seriesName && fresh.seriesName !== currentInfo.seriesName) {
+      const freshKey = fresh ? pageKeyOf(fresh) : ''
+      if (
+        fresh &&
+        fresh.seriesName &&
+        (freshKey !== currentPageKey ||
+          fresh.seriesName !== currentInfo.seriesName ||
+          fresh.episode !== currentInfo.episode)
+      ) {
         console.info('[danmaku-enhance] 挂载时按 bvid 校正标题', {
           bvid: currentVid,
           from: currentInfo.seriesName,
           to: fresh.seriesName,
         })
+        restoreKeys.add(currentPageKey)
+        const freshVidKey = vidPageKeyOf(fresh, currentVid)
+        if (freshVidKey) restoreKeys.add(freshVidKey)
         currentInfo = fresh
-        currentPageKey = pageKeyOf(fresh)
+        currentPageKey = freshKey
         searchInput.value = cleanTitle(fresh.seriesName)
         setCid(fresh.cid)
         setPageKey(currentPageKey)
         render()
       }
     }
-    await restoreSources()
-    render()
+    // URL 来源整集预取可能持续很久，不能阻塞弹弹play匹配；来源条目先在
+    // 后台恢复，加载完成后通过 subscribe() 触发 URL fallback 即可。
+    void restoreSources([...restoreKeys])
+      .then(() => render())
+      .catch((error) =>
+        console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
+      )
     if (config.enabled) void ensureMatch()
   })()
 
@@ -1934,7 +2067,13 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     const nextVid = readBvid()
     if (nextVid && currentVid && nextVid !== currentVid) {
       console.info('[danmaku-enhance] 检测到换视频', { from: currentVid, to: nextVid })
-      resetForPage(next, `vid:${nextVid}#${next.episode ?? ''}`, nextVid)
+      // key 必须走 pageKeyOf(next) 而不是手工拼 `vid:` 前缀：
+      // next 有 cid 时（videoData 读到了）就应该是 `cid:xxx`。
+      // 之前硬编码 vid: 前缀，合集页上 pageKey 会在 `vid:...#N` 与
+      // `cid:xxx` 之间来回摇摆——cid 回调刚把状态确定下来，下一轮
+      // checkPage 又把它拉回 vid: 形态，再触发一次 cid 回调整套重置
+      // （用户日志里「检测到换集」连刷两次就是这么来的）。
+      resetForPage(next, pageKeyOf(next), nextVid)
       return
     }
 
@@ -1963,7 +2102,31 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     // 真正的换集/换视频自有 bvid、ep_id、cid 三条路径负责。
     if (currentPageKey.startsWith('cid:') && !next.cid) return
     const nextKey = pageKeyOf(next)
-    if (nextKey === currentPageKey) return
+    if (nextKey === currentPageKey) {
+      // 初次挂载时标题可能还没渲染，或 DOM 兜底先读到残缺标题；这时
+      // pageKey 不变，原来的早退会让面板永远停在「未识别标题」/旧番名。
+      // 只在当前信息还不是 video/bangumi 可靠来源时接纳这次补全，避免
+      // 用短暂的旧 DOM 标题覆盖已经确认的页面状态。
+      const currentReliable =
+        currentInfo.source === 'video' || currentInfo.source === 'bangumi'
+      if (
+        !currentReliable &&
+        next.seriesName &&
+        next.seriesName !== currentInfo.seriesName
+      ) {
+        console.info('[danmaku-enhance] 标题信息已补全', {
+          from: currentInfo.seriesName,
+          to: next.seriesName,
+        })
+        currentInfo = next
+        searchInput.value = cleanTitle(next.seriesName)
+        resetMatch('')
+        setCid(next.cid)
+        render()
+        if (config.enabled) void ensureMatch()
+      }
+      return
+    }
 
     console.info('[danmaku-enhance] 检测到页面变化（title/url 路径）', {
       href: location.href,
@@ -2005,10 +2168,15 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     if (forced) beginForced()
     void syncForced()
     void (async () => {
+      const restoreKeys = new Set<string>()
+      if (nextKey) restoreKeys.add(nextKey)
+      const nextVidKey = vidPageKeyOf(next, nextVid)
+      if (nextVidKey) restoreKeys.add(nextVidKey)
+
       // 软跳转到新视频时 `readPageInfo()` 给回的很可能是旧视频的标题
       // （`__INITIAL_STATE__` 没重写、DOM 还没刷）。按 URL 上的 bvid
       // 重新问一次接口，拿到真标题再匹配，否则会一直拿上一个视频去搜。
-      if (nextVid && next.source !== 'video' && next.source !== 'bangumi') {
+      if (nextVid && currentPageKey.startsWith('vid:')) {
         const fresh = await readVideoInfoByBvidAsync(nextVid).catch(() => undefined)
         if (detached) return
         if (fresh && fresh.seriesName) {
@@ -2017,16 +2185,23 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
             title: fresh.seriesName,
             episode: fresh.episode,
           })
+          const freshKey = pageKeyOf(fresh)
+          restoreKeys.add(currentPageKey)
+          const freshVidKey = vidPageKeyOf(fresh, nextVid)
+          if (freshVidKey) restoreKeys.add(freshVidKey)
           currentInfo = fresh
-          currentPageKey = pageKeyOf(fresh)
+          currentPageKey = freshKey
           searchInput.value = cleanTitle(fresh.seriesName)
           setCid(fresh.cid)
           setPageKey(currentPageKey)
           render()
         }
       }
-      await restoreSources()
-      render()
+      void restoreSources([...restoreKeys])
+        .then(() => render())
+        .catch((error) =>
+          console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
+        )
       if (config.enabled) void ensureMatch()
     })()
   }
@@ -2038,50 +2213,105 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
    * `?p=` 不一定更新、`__INITIAL_STATE__` 也不会重写，于是它发现不了；
    * 但播放器换集必须用新 cid 去请求弹幕，这个 cid 我们拦得到。
    */
+  // 同一个 cid 只处理一次。播放器在合集页初始化后，同一 cid 的分段请求
+  // 可能分几批到达（切清晰度、预取、重试都会再拦一次）；没有这层去重时，
+  // 每一批都会把刚匹配好的状态整套推倒重来 —— 用户日志里「挂载即匹配成功，
+  // 几十秒后两次『检测到换集』+ 白名单重新按住」就是这么来的。
+  let lastCidHandled: number | null = null
+  let cidInFlight: number | null = null
+  let cidGeneration = 0
   const unsubscribeCid = onCidChange((cid) => {
     if (detached) return
-    void readVideoInfoByCidAsync(cid).then((next) => {
-      if (detached) return
-      if (!next) {
-        console.info('[danmaku-enhance] 播放器换了 cid，但 pages/接口都没找到', { cid })
-        return
-      }
-      const nextKey = pageKeyOf(next)
-      if (nextKey === currentPageKey) return
+    // 同一个 cid 的分段请求可能连续到达；请求已成功应用时跳过，
+    // 但失败过的 cid 必须允许下一次请求重试。
+    if (cid === cidInFlight) return
+    if (cid === lastCidHandled && currentInfo.cid === cid) return
+    cidInFlight = cid
+    const attempt = ++cidGeneration
+    void readVideoInfoByCidAsync(cid)
+      .then((next) => {
+        if (cidInFlight === cid) cidInFlight = null
+        if (detached) return
+        // 新 cid 已经开始处理时，旧 cid 的慢查询结果不能回头覆盖页面。
+        if (attempt !== cidGeneration) return
+        if (!next) {
+          console.info('[danmaku-enhance] 播放器换了 cid，但 pages/接口都没找到', { cid })
+          return
+        }
+        lastCidHandled = cid
+        const nextKey = pageKeyOf(next)
+        if (nextKey === currentPageKey) return
 
-      console.info('[danmaku-enhance] 检测到换集（cid 路径）', {
-        cid,
-        from: currentPageKey,
-        to: nextKey,
-        episode: next.episode,
-      })
-      currentInfo = next
-      currentPageKey = nextKey
-      // 换集也可能伴着换视频（合集里点下一集跳到别的 bvid），
-      // 这里顺手同步一次，避免 checkPage 拿旧的 bvid 再重置一遍
-      currentVid = readBvid()
-      currentEp = readEpisodeId()
-      clearToast()
-      searchInput.value = cleanTitle(next.seriesName)
-      matchTip.textContent = ''
-      resetMatch('')
-      // 换集/切分P 也是真换页：新的一集要重新说明「为什么按住」。
-      lastHoldReason = ''
-      setCid(cid)
-      setPageKey(nextKey)
-      // URL 源是挂在 cid 上的，换集后要跟着换
-      resetUrlSources()
-      render()
-      // 同一个 UP 主换了集/换了分P：白名单待遇不变，不用等接口确认就能
-      // 重新按住。上一集匹配成功时 releaseHold() 过、pauseWatch 也停了，
-      // 不重做这一遍就会出现「切集之后既不暂停也不扣留」。
-      if (forced) beginForced()
-      void (async () => {
-        await restoreSources()
+        // 初次挂载时页面信息可能只有 URL/DOM 兜底，暂时拿不到 cid，
+        // 所以 currentPageKey 还不是 `cid:*`。播放器发出
+        // 第一条分段请求后，hook 才能拿到真实 cid；这只是给当前页面补全
+        // 身份，不是用户切了集。这里不能走下面的 resetForPage 逻辑，
+        // 否则已经匹配成功并开始播放的视频会被误判成换集，再次暂停并匹配。
+        const isInitialCidHydration =
+          !currentPageKey.startsWith('cid:') &&
+          !currentInfo.cid &&
+          currentVid === readBvid() &&
+          currentEp === readEpisodeId()
+        if (isInitialCidHydration) {
+          console.info('[danmaku-enhance] 用首个 cid 补全当前页面', {
+            cid,
+            pageKey: currentPageKey,
+            to: nextKey,
+          })
+          // 保留已经从 DOM/标题匹配出的名称与集数；cid 反查结果的 episode
+          // 在分P名缺失时可能为空，不能用它覆盖已有的页面信息。
+          currentInfo = {
+            ...currentInfo,
+            cid,
+            aid: next.aid ?? currentInfo.aid,
+          }
+          currentPageKey = nextKey
+          setCid(cid)
+          setPageKey(nextKey)
+          render()
+          return
+        }
+
+        console.info('[danmaku-enhance] 检测到换集（cid 路径）', {
+          cid,
+          from: currentPageKey,
+          to: nextKey,
+          episode: next.episode,
+        })
+        currentInfo = next
+        currentPageKey = nextKey
+        // 换集也可能伴着换视频（合集里点下一集跳到别的 bvid），
+        // 这里顺手同步一次，避免 checkPage 拿旧的 bvid 再重置一遍
+        currentVid = readBvid()
+        currentEp = readEpisodeId()
+        clearToast()
+        searchInput.value = cleanTitle(next.seriesName)
+        matchTip.textContent = ''
+        resetMatch('')
+        // 换集/切分P 也是真换页：新的一集要重新说明「为什么按住」。
+        lastHoldReason = ''
+        setCid(cid)
+        setPageKey(nextKey)
+        // URL 源是挂在 cid 上的，换集后要跟着换
+        resetUrlSources()
         render()
-        if (config.enabled) void ensureMatch()
-      })()
-    })
+        // 同一个 UP 主换了集/换了分P：白名单待遇不变，不用等接口确认就能
+        // 重新按住。上一集匹配成功时 releaseHold() 过、pauseWatch 也停了，
+        // 不重做这一遍就会出现「切集之后既不暂停也不扣留」。
+        if (forced) beginForced()
+        void (async () => {
+          void restoreSources([nextKey, vidPageKeyOf(next, currentVid)].filter(Boolean))
+            .then(() => render())
+            .catch((error) =>
+              console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
+            )
+          if (config.enabled) void ensureMatch()
+        })()
+      })
+      .catch((error) => {
+        if (cidInFlight === cid) cidInFlight = null
+        console.warn('[danmaku-enhance] cid 反查失败', { cid, error })
+      })
   })
 
   let checkTimer: number | undefined
