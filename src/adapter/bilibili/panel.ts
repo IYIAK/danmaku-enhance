@@ -1246,6 +1246,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   let urlFallbackCount = 0
   /** URL 来源加入时播放器已经请求过弹幕，需要提醒刷新当前分段 */
   let urlFallbackNeedsRefresh = false
+  /** 播放已经开始后手动加入 URL 来源，需要提醒当前分段刷新 */
+  let urlSourceNotice = ''
+  let urlSourceNeedsRefresh = false
   let reloadHint = ''
   let reloading = false
   // 匹配序号：每重置一次就 +1，异步链路在每个 await 之后核对。
@@ -1265,6 +1268,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     notice = nextNotice
     urlFallbackCount = 0
     urlFallbackNeedsRefresh = false
+    urlSourceNotice = ''
+    urlSourceNeedsRefresh = false
     setComments(null)
   }
 
@@ -1293,8 +1298,12 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
    * 口径与成功时的 announceMatch 一致。数据没就绪时不加尾巴。
    * 括号内容放第二行：状态行宽度有限，连着排会折成难看的三行。
    */
+  function availableTotal() {
+    return (getComments()?.length ?? 0) + getTotalCount()
+  }
+
   function withTotal(base: string) {
-    const total = (getComments()?.length ?? 0) + getTotalCount()
+    const total = availableTotal()
     return total ? `${base}\n弹幕已就绪：共 ${total} 条` : base
   }
 
@@ -1326,6 +1335,16 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       statusMain.textContent = '未开启'
       statusSub.textContent = '打开开关后才会向播放器注入弹幕'
       debugBox.textContent = ''
+      return
+    }
+    if (urlSourceNotice && urlSourceNeedsRefresh) {
+      statusMain.textContent = urlSourceNotice
+      const total = availableTotal()
+      statusSub.textContent = total
+        ? `共 ${total} 条，当前分段可能已缓存，刷新后生效`
+        : '当前分段可能已缓存，刷新后生效'
+      pageReloadBtn.hidden = false
+      debugBox.textContent = debugLine(stats)
       return
     }
     if (urlFallbackCount > 0 && notice) {
@@ -1370,8 +1389,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         statusSub.textContent = withTotal('本段为切换集数前的弹幕，刷新后生效')
         pageReloadBtn.hidden = false
       } else if (stats.injected > 0) {
-        statusSub.textContent = stats.available
-          ? `共 ${stats.available} 条，当前分段已注入 ${stats.injected} 条${
+        const total = availableTotal()
+        statusSub.textContent = total
+          ? `共 ${total} 条，当前分段已注入 ${stats.injected} 条${
               extra ? `（${extra}）` : ''
             }`
           : `已注入 ${stats.injected} 条（${stats.segments} 段）${
@@ -1890,8 +1910,25 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     urlAddBtn.textContent = '…'
     urlTip.classList.remove('is-error')
     try {
-      await addSource(url)
+      const entry = await addSource(url)
       urlInput.value = ''
+      // 播放器已经取过当前分段后再加入来源：后续分段会自动使用新来源，
+      // 但当前分段通常已经在播放器内存中，不能靠脚本重新触发请求。
+      // 只对手动添加设置这个提示，页面初始化时恢复旧来源不应反复提示刷新。
+      if (entry.items.length > 0 && getStats().requests > 0) {
+        urlSourceNotice = `URL来源已加载 ${entry.items.length} 条弹幕`
+        urlSourceNeedsRefresh = true
+        const total = availableTotal()
+        showToast(
+          total
+            ? `${urlSourceNotice}，共 ${total} 条；刷新页面后当前段生效`
+            : `${urlSourceNotice}，刷新页面后当前段生效`,
+          {
+            key: 'url-source',
+            action: { label: '刷新', onClick: () => location.reload() },
+          }
+        )
+      }
       applyUrlFallback()
     } catch (error) {
       urlTip.textContent = `添加失败：${(error as Error)?.message || error}`
