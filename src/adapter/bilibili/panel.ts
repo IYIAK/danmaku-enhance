@@ -1261,6 +1261,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   /** 播放已经开始后手动加入 URL 来源，需要提醒当前分段刷新 */
   let urlSourceNotice = ''
   let urlSourceNeedsRefresh = false
+  let announcedMatch: { name: string; episodeName: string; count: number } | null = null
   let reloadHint = ''
   let reloading = false
   // 匹配序号：每重置一次就 +1，异步链路在每个 await 之后核对。
@@ -1282,6 +1283,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     urlFallbackNeedsRefresh = false
     urlSourceNotice = ''
     urlSourceNeedsRefresh = false
+    announcedMatch = null
     setComments(null)
   }
 
@@ -1980,6 +1982,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     // 加载进度只在面板打开时重绘
     if (opened) renderUrls()
     applyUrlFallback()
+    refreshAnnouncedCount()
     renderStatus()
   })
 
@@ -1993,6 +1996,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
    */
   function announceMatch(name: string, episodeName: string, count: number) {
     if (detached) return
+    announcedMatch = { name, episodeName, count }
     const title = [name, episodeName].filter(Boolean).join(' · ')
     if (title) showToast(title, { key: 'title', duration: 4000 })
     if (count > 0) {
@@ -2001,6 +2005,18 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         duration: 4000,
       })
     }
+  }
+
+  /** URL 来源是后台恢复的，晚于弹弹play匹配时补发一次完整总数。 */
+  function refreshAnnouncedCount() {
+    if (detached || !announcedMatch) return
+    const count = availableTotal()
+    if (count <= announcedMatch.count) return
+    announcedMatch.count = count
+    showToast(`匹配成功，已加载 ${count} 条第三方弹幕`, {
+      key: 'count',
+      duration: 4000,
+    })
   }
   // 播放器切全屏/宽屏会重建控制条，按钮被丢掉就重新挂回去。
   // 面板本身的位置不再跟着 DOM 变动走——那会让它在滚动时乱跳。
