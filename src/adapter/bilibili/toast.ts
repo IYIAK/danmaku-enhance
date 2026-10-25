@@ -44,6 +44,8 @@ export interface ToastOptions {
   key?: string
   /** 显示时长（毫秒） */
   duration?: number
+  /** 带 action 的提示是否也按 duration 自动淡出 */
+  autoHide?: boolean
   /**
    * 提示右侧的可点按钮（如「确认」）。带 action 的提示不会自动淡出，
    * 必须由调用方在动作完成后用 clearToast(key) 收掉——
@@ -258,7 +260,7 @@ export function showToast(text: string, options: ToastOptions | number = {}) {
   target.node.classList.add('is-visible')
 
   // 带 action 的提示常驻到调用方主动 clearToast，定时消失会让确认落空
-  if (!opts.action) {
+  if (!opts.action || opts.autoHide) {
     target.hideTimer = window.setTimeout(() => {
       target.hideTimer = undefined
       items = items.filter((o) => o !== target)

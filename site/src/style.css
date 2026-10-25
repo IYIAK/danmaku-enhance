@@ -177,7 +177,43 @@ code {
     rgba(251, 114, 153, 0.18),
     transparent 68%
   );
+  animation: hero-spotlight 16s ease-in-out infinite alternate;
   pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  top: 120px;
+  right: -220px;
+  width: 560px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(103, 77, 199, 0.1),
+    transparent 70%
+  );
+  filter: blur(22px);
+  animation: hero-aurora 20s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes hero-spotlight {
+  from { transform: translateX(-50%) translate3d(-3%, -2%, 0) scale(0.96); }
+  to { transform: translateX(-50%) translate3d(4%, 3%, 0) scale(1.04); }
+}
+
+@keyframes hero-aurora {
+  from { transform: translate3d(0, 0, 0) rotate(-4deg); opacity: 0.65; }
+  to { transform: translate3d(-70px, 35px, 0) rotate(7deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero::before,
+  .hero::after {
+    animation: none;
+  }
 }
 
 .hero .wrap {

@@ -411,6 +411,11 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      cursor: pointer;
+
+      &:hover {
+        color: #d1d5db;
+      }
 
       > span:first-child {
         flex: 1 1 auto;

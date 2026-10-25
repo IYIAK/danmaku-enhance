@@ -338,6 +338,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     urlFold.setAttribute('aria-expanded', String(!urlBody.hidden))
     urlFold.title = urlBody.hidden ? '展开 URL 弹幕源' : '收起 URL 弹幕源'
   })
+  urlTitle.addEventListener('click', (event) => {
+    if ((event.target as Element | null)?.closest?.('button')) return
+    urlFold.click()
+  })
 
   // ── UP 主白名单 ─────────────────────────────────────────
   //
@@ -395,6 +399,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     whitelistFold.classList.toggle('is-expanded', !whitelistBody.hidden)
     whitelistFold.setAttribute('aria-expanded', String(!whitelistBody.hidden))
     whitelistFold.title = whitelistBody.hidden ? '展开名单管理' : '收起名单管理'
+  })
+  whitelistTitle.addEventListener('click', (event) => {
+    if ((event.target as Element | null)?.closest?.('button')) return
+    whitelistFold.click()
   })
 
   // 弹弹play
@@ -515,6 +523,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     filterFold.classList.toggle('is-expanded', !filterBody.hidden)
     filterFold.setAttribute('aria-expanded', String(!filterBody.hidden))
     filterFold.title = filterBody.hidden ? '展开过滤设置' : '收起过滤设置'
+  })
+  filterTitle.addEventListener('click', (event) => {
+    if ((event.target as Element | null)?.closest?.('button')) return
+    filterFold.click()
   })
 
   function readFilterFromDom(): FilterConfig {
@@ -1919,12 +1931,13 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         urlSourceNotice = `URL来源已加载 ${entry.items.length} 条弹幕`
         urlSourceNeedsRefresh = true
         const total = availableTotal()
+        showToast(urlSourceNotice, { key: 'url-source-count', duration: 4000 })
         showToast(
-          total
-            ? `URL弹幕 +${entry.items.length} 条 · 共 ${total} 条`
-            : `URL弹幕 +${entry.items.length} 条`,
+          total ? `共 ${total} 条，刷新页面后当前段生效` : '刷新页面后当前段生效',
           {
-            key: 'url-source',
+            key: 'url-source-refresh',
+            duration: 6000,
+            autoHide: true,
             action: { label: '刷新', onClick: () => location.reload() },
           }
         )

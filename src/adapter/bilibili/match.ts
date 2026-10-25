@@ -109,7 +109,7 @@ const TECH_TAGS_CN = /(?:超清|蓝光(?:原盘)?|高清|极清|原画|杜比视
 
 /** 首尾要剥掉的标点与括号（成对出现的两边都剥） */
 const EDGE_PUNCT =
-  /[\s\-–—_:：、,，.。!！?？|~～【】［］\[\]（）()《》<>『』「」“”"'‘’]+/g
+  /[\s\/／\-–—_:：、,，.。!！?？|~～【】［］\[\]（）()《》<>『』「」“”"'‘’]+/g
 
 /** 成对的括号：页面标题里经常只有一半，另一半被集数标记啃掉了 */
 const BRACKET_PAIRS: [string, string][] = [
@@ -134,7 +134,7 @@ const BRACKET_PAIRS: [string, string][] = [
  * 所以 `赛博朋克：边缘行者` 不会被拆开。
  */
 function dropTechTags(title: string): string {
-  const parts = title.split(/([\s\u3000|·、]+)/)
+  const parts = title.split(/([\s\u3000\/／|·、]+)/)
   let touched = false
   const kept = parts.map((part) => {
     if (!part.trim()) return part
