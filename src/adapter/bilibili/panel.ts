@@ -1921,8 +1921,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         const total = availableTotal()
         showToast(
           total
-            ? `${urlSourceNotice}，共 ${total} 条；刷新页面后当前段生效`
-            : `${urlSourceNotice}，刷新页面后当前段生效`,
+            ? `URL弹幕 +${entry.items.length} 条 · 共 ${total} 条`
+            : `URL弹幕 +${entry.items.length} 条`,
           {
             key: 'url-source',
             action: { label: '刷新', onClick: () => location.reload() },
