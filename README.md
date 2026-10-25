@@ -8,6 +8,49 @@
 
 ## 哔哩哔哩：实现方式
 
+URL 弹幕源恢复与弹弹play匹配并行进行，播放器放行前等待两路数据汇合：
+
+```mermaid
+sequenceDiagram
+    participant P as B站页面
+    participant M as 面板
+    participant U as URL来源
+    participant D as 弹弹play
+    participant H as Hook
+    participant V as 播放器
+
+    P->>M: 页面加载 / 换视频 / 换集
+    M->>H: 安装 XHR / fetch 拦截
+
+    par 并行恢复 URL来源
+        M->>U: 读取并加载已保存的 URL来源
+        U-->>M: URL弹幕加载完成
+    and 并行匹配弹弹play
+        M->>D: 搜索番剧和集数
+        D-->>M: 返回弹弹play弹幕
+    end
+
+    V->>H: 请求弹幕分段
+
+    alt 两路数据尚未完成
+        alt 白名单视频
+            H->>H: 持续扣住响应
+        else 普通视频
+            H->>H: 最多等待 8 秒
+        end
+    end
+
+    D-->>M: 弹弹play结果已准备
+    M->>M: 等待 URL来源恢复完成
+    U-->>M: URL来源结果已准备
+
+    M->>H: setComments(弹弹play + URL来源)
+    M->>H: releaseHold()
+    H->>H: 合并、过滤、去重
+    H-->>V: 返回合并后的弹幕响应
+    V->>P: 渲染弹幕
+```
+
 哔哩哔哩播放器按 6 分钟一段请求弹幕：
 
 ```
