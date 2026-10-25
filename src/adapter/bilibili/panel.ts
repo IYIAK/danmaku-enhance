@@ -1645,11 +1645,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
 
     const task = (async () => {
       try {
-        // URL 来源恢复与弹弹play匹配是两条网络链路。先等当前页面保存的
-        // URL 源全部加载完成，再请求弹弹play，这样白名单放行时首段就能
-        // 同时带上两路弹幕；没有 URL 源时这里立即完成，不增加等待。
-        await urlRestorePromise
-        if (!isCurrentMatch(seq)) return
+        // URL 来源恢复与弹弹play匹配并行进行；两者在 pickEpisode() 汇合，
+        // 这样总耗时取较慢的一路，而不是两路相加。
         const keyword = cleanTitle(currentInfo.seriesName)
         if (!keyword) throw new MatchError('未识别到当前视频的标题')
 
@@ -1825,6 +1822,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       // 用户在这期间换了视频/换了集：这批弹幕属于上一页，丢掉
       if (!isCurrentMatch(seq)) return
       if (!comments.length) {
+        // 即使弹弹play先返回空集，也要等 URL 来源恢复完成后再判断是否
+        // 能用 URL 弹幕接管，不能提前把这一集定成「没有弹幕」。
+        await urlRestorePromise
+        if (!isCurrentMatch(seq)) return
         busy = false
         notice = '该集没有弹幕'
         setComments([])
@@ -1835,6 +1836,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         return
       }
       // 保留 episodeOptions：用户选错了要能再改回来
+      // 弹弹play和 URL 来源并行请求；在写入候选集、释放扣留前等待两路汇合，
+      // 防止 Hook 看到 comments 后先用一份还没有 URL 弹幕的候选集处理首段。
+      await urlRestorePromise
+      if (!isCurrentMatch(seq)) return
       notice = ''
       busy = false
       setComments(comments)

@@ -9,9 +9,24 @@
 
 export const RELEASES = [
   {
-    version: '2.0.20',
+    version: '2.0.21',
     date: '2026-10-25',
     latest: true,
+    summary:
+      '优化 URL 弹幕源与弹弹play的加载时序，让两路请求并行并在放行前汇合。',
+    groups: [
+      {
+        name: '优化',
+        items: [
+          '**并行加载弹幕来源**：URL来源恢复和弹弹play匹配同时进行，弹幕放行前等待两路都完成，减少不必要的启动等待并避免首段漏注入',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2.0.20',
+    date: '2026-10-25',
+    latest: false,
     summary:
       '修复刷新页面后 URL 弹幕源恢复较慢时，首段弹幕没有同时注入的问题。',
     groups: [
