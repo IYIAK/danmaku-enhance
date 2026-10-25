@@ -9,9 +9,24 @@
 
 export const RELEASES = [
   {
-    version: '2.0.19',
+    version: '2.0.20',
     date: '2026-10-25',
     latest: true,
+    summary:
+      '修复刷新页面后 URL 弹幕源恢复较慢时，首段弹幕没有同时注入的问题。',
+    groups: [
+      {
+        name: '修复',
+        items: [
+          '**URL 弹幕源恢复时序**：刷新页面后先等待已保存的 URL 来源加载完成，再开始弹弹play匹配；白名单视频不会在 URL 弹幕还没准备好时提前放行',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2.0.19',
+    date: '2026-10-25',
+    latest: false,
     summary:
       '修复播放中追加 URL 弹幕源后的状态提示与弹幕总数统计，补充当前分段刷新入口。',
     groups: [
