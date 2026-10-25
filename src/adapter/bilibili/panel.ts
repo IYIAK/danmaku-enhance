@@ -1269,6 +1269,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   // 上一个视频的番名、集数、弹幕写进新页面——表现就是「换了视频还是
   // 上一个视频的匹配结果」。
   let matchSeq = 0
+  /** 当前页面已保存的 URL 来源恢复任务；匹配结果要等它完成后再确定。 */
+  let urlRestorePromise: Promise<void> = Promise.resolve()
 
   function resetMatch(nextNotice = '') {
     matchSeq++
@@ -1290,6 +1292,16 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   /** 异步链路里每个 await 之后都要问一句：我还是当前这一轮吗？ */
   function isCurrentMatch(seq: number) {
     return !detached && seq === matchSeq
+  }
+
+  function startUrlRestore(keys: string[]) {
+    const task = restoreSources(keys)
+      .then(() => render())
+      .catch((error) => {
+        console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
+      })
+    urlRestorePromise = task
+    return task
   }
 
   function render() {
@@ -1633,6 +1645,11 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
 
     const task = (async () => {
       try {
+        // URL 来源恢复与弹弹play匹配是两条网络链路。先等当前页面保存的
+        // URL 源全部加载完成，再请求弹弹play，这样白名单放行时首段就能
+        // 同时带上两路弹幕；没有 URL 源时这里立即完成，不增加等待。
+        await urlRestorePromise
+        if (!isCurrentMatch(seq)) return
         const keyword = cleanTitle(currentInfo.seriesName)
         if (!keyword) throw new MatchError('未识别到当前视频的标题')
 
@@ -2100,13 +2117,8 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         render()
       }
     }
-    // URL 来源整集预取可能持续很久，不能阻塞弹弹play匹配；来源条目先在
-    // 后台恢复，加载完成后通过 subscribe() 触发 URL fallback 即可。
-    void restoreSources([...restoreKeys])
-      .then(() => render())
-      .catch((error) =>
-        console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
-      )
+    // 匹配会等待这项恢复任务，避免 URL 源慢于弹弹play时首段漏注入。
+    void startUrlRestore([...restoreKeys])
     if (config.enabled) void ensureMatch()
   })()
 
@@ -2263,11 +2275,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
           render()
         }
       }
-      void restoreSources([...restoreKeys])
-        .then(() => render())
-        .catch((error) =>
-          console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
-        )
+      void startUrlRestore([...restoreKeys])
       if (config.enabled) void ensureMatch()
     })()
   }
@@ -2366,11 +2374,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         // 不重做这一遍就会出现「切集之后既不暂停也不扣留」。
         if (forced) beginForced()
         void (async () => {
-          void restoreSources([nextKey, vidPageKeyOf(next, currentVid)].filter(Boolean))
-            .then(() => render())
-            .catch((error) =>
-              console.warn('[danmaku-enhance] 恢复 URL 来源失败', error)
-            )
+          void startUrlRestore([nextKey, vidPageKeyOf(next, currentVid)].filter(Boolean))
           if (config.enabled) void ensureMatch()
         })()
       })
