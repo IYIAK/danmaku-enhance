@@ -1586,26 +1586,21 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
 
   // ── 匹配动作 ────────────────────────────────────────────
 
-  /** 播放器已经开始播过时，即使这轮面板重建后请求计数被清空，
-   * 也能把「没有重发分段」识别成缓存，而不是误报成等待请求。 */
-  function playerHasStarted() {
-    const video = document.querySelector('video') as HTMLVideoElement | null
-    return !!video && (video.currentTime > 0 || !video.paused)
-  }
-
   /**
    * 换集后给播放器 800ms 自己重发弹幕请求（它换 cid 时本来就会重拉），
    * 看到了就清掉缓存提示。不再主动触发任何 seek/重载——那些方案都会
    * 把播放位置挪走，用户明确要求删干净。
    */
-  function reloadDanmaku() {
+  function reloadDanmaku(showCachedHint = false) {
     if (reloading) return
     // 先记下这次匹配前播放器是否已经取过弹幕。匹配完成后播放器可能
     // 不会重发同一分段；这种情况应该明确告诉用户「本段已缓存」，而不是
     // 让状态栏落到「等待播放器请求」的兜底分支。
     const before = getStats()
     const hadCachedRequest =
-      before.requests > 0 && (before.missed > 0 || playerHasStarted())
+      showCachedHint &&
+      before.requests > 0 &&
+      before.missed > 0
     reloading = true
     // 等待探测期间沿用现有状态；只有确认播放器没有重发时才切换到
     // 「本段已缓存」，避免短暂显示一个无法说明结果的中间态。
@@ -1616,7 +1611,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       reloading = false
       if (method) {
         reloadHint = ''
-      } else if (hadCachedRequest || playerHasStarted()) {
+      } else if (hadCachedRequest) {
         reloadHint = '本段已缓存，刷新生效'
       } else {
         reloadHint = ''
@@ -1653,7 +1648,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     clearToast('hold-tip')
     showToast(notice, { key: 'count', duration: 4000 })
     resumeIfWePaused()
-    reloadDanmaku()
+    reloadDanmaku(announcedMatch !== null || getStats().missed > 0)
     return true
   }
 
@@ -1873,6 +1868,10 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       // 「加载成功」误导用户，要明说「当前段还是旧的，刷新生效」，
       // 并把状态行右上角的刷新按钮亮出来。
       const staleSeg = isStaleSegment()
+      // 首次匹配成功后也会探测播放器是否自然重发请求，但这不代表
+      // 当前段一定是缓存。只有切换/重新匹配已有结果，或明确错过首段时，
+      // 探测失败才应该显示「本段已缓存，刷新生效」。
+      const rematching = announcedMatch !== null || staleSeg || getStats().missed > 0
       releaseHold()
       rememberMatch(currentInfo, current, ep)
       render()
@@ -1896,7 +1895,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         resumeIfWePaused()
       }
       // 弹幕就绪：让播放器把当前分段重新取一遍，否则已缓存的分段不会经过 hook
-      reloadDanmaku()
+      reloadDanmaku(rematching)
     } catch (error) {
       if (!isCurrentMatch(seq)) return
       busy = false
