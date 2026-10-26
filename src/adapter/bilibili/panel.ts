@@ -1414,6 +1414,12 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         // 显示旧数据，看起来像重选没生效（toast 却说了切换集数，自相矛盾）。
         statusSub.textContent = withTotal('本段为切换集数前的弹幕，刷新后生效')
         pageReloadBtn.hidden = false
+      } else if (reloadHint) {
+        // reloadDanmaku 已确认播放器没有重发当前分段。这个结果优先于
+        // requests===0 的兜底提示，否则播放中重新匹配后会一直显示「等待
+        // 播放器请求弹幕」，用户看不出弹幕其实已经准备好了。
+        statusSub.textContent = withTotal(reloadHint)
+        pageReloadBtn.hidden = false
       } else if (stats.injected > 0) {
         const total = availableTotal()
         statusSub.textContent = total
@@ -1580,6 +1586,13 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
 
   // ── 匹配动作 ────────────────────────────────────────────
 
+  /** 播放器已经开始播过时，即使这轮面板重建后请求计数被清空，
+   * 也能把「没有重发分段」识别成缓存，而不是误报成等待请求。 */
+  function playerHasStarted() {
+    const video = document.querySelector('video') as HTMLVideoElement | null
+    return !!video && (video.currentTime > 0 || !video.paused)
+  }
+
   /**
    * 换集后给播放器 800ms 自己重发弹幕请求（它换 cid 时本来就会重拉），
    * 看到了就清掉缓存提示。不再主动触发任何 seek/重载——那些方案都会
@@ -1587,15 +1600,27 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
    */
   function reloadDanmaku() {
     if (reloading) return
+    // 先记下这次匹配前播放器是否已经取过弹幕。匹配完成后播放器可能
+    // 不会重发同一分段；这种情况应该明确告诉用户「本段已缓存」，而不是
+    // 让状态栏落到「等待播放器请求」的兜底分支。
+    const before = getStats()
+    const hadCachedRequest =
+      before.requests > 0 && (before.missed > 0 || playerHasStarted())
     reloading = true
-    reloadHint = '正在等待弹幕重新加载…'
+    // 等待探测期间沿用现有状态；只有确认播放器没有重发时才切换到
+    // 「本段已缓存」，避免短暂显示一个无法说明结果的中间态。
+    reloadHint = ''
     render()
 
     void forceReloadDanmaku().then((method) => {
       reloading = false
-      reloadHint = method
-        ? ''
-        : '改动已保存，之后的分段会自动生效；当前段要刷新页面才会重取'
+      if (method) {
+        reloadHint = ''
+      } else if (hadCachedRequest || playerHasStarted()) {
+        reloadHint = '本段已缓存，刷新生效'
+      } else {
+        reloadHint = ''
+      }
       if (method) {
         console.info('[danmaku-enhance]', method, '弹幕已重新加载')
       }

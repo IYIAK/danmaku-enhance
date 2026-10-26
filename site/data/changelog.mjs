@@ -9,9 +9,23 @@
 
 export const RELEASES = [
   {
+    version: '2.0.22',
+    date: '2026-10-27',
+    latest: true,
+    summary: '修复播放后重新匹配时，面板错误显示等待播放器请求的问题。',
+    groups: [
+      {
+        name: '修复',
+        items: [
+          '**缓存状态提示**：播放已经开始后切换集数或重新匹配，若播放器没有重发当前分段，现在会显示「本段已缓存，刷新生效」并提供刷新按钮',
+        ],
+      },
+    ],
+  },
+  {
     version: '2.0.21',
     date: '2026-10-25',
-    latest: true,
+    latest: false,
     summary:
       '优化 URL 弹幕源与弹弹play的加载时序，让两路请求并行并在放行前汇合。',
     groups: [
