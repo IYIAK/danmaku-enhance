@@ -9,9 +9,24 @@
 
 export const RELEASES = [
   {
+    version: '2.0.24',
+    date: '2026-10-29',
+    latest: true,
+    summary: '统一 B站弹幕刷新提示，并修复错误日志显示。',
+    groups: [
+      {
+        name: '修复',
+        items: [
+          '**刷新提示**：切换集数、重新匹配或播放后手动添加 URL 弹幕源时，当前分段需要重新获取的 Toast 统一提供刷新按钮，并在 6 秒后自动消失',
+          '**错误日志**：网络请求失败不再显示 `[object Object]`，改为可读的错误原因',
+        ],
+      },
+    ],
+  },
+  {
     version: '2.0.23',
     date: '2026-10-27',
-    latest: true,
+    latest: false,
     summary: '修复首次匹配成功后误显示当前分段已缓存的问题。',
     groups: [
       {

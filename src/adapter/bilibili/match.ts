@@ -16,6 +16,7 @@ import {
   storageEpisodeName,
 } from '../../player/plugins/danmaku/utils'
 import type { BiliPageInfo } from './info'
+import { errorMessage } from './error'
 
 export type AnimeItem = Anime
 export type EpisodeItem = Episode
@@ -589,7 +590,7 @@ export async function findAnime(
     try {
       list = await searchAnime(keyword)
     } catch (error) {
-      log?.(`搜索「${keyword}」失败：${(error as Error)?.message || error}`)
+      log?.(`搜索「${keyword}」失败：${errorMessage(error)}`)
       continue
     }
 

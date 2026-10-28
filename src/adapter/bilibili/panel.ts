@@ -62,6 +62,7 @@ import {
 } from './sources/state'
 import type { UrlSourceEntry } from './sources/state'
 import { clearToast, disposeToast, showToast } from './toast'
+import { errorMessage } from './error'
 import { mountOverlay, onFullscreenChange } from './overlay'
 
 const ROOT_CLASS = 'k-bili-dm'
@@ -1264,6 +1265,15 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
   let announcedMatch: { name: string; episodeName: string; count: number } | null = null
   let reloadHint = ''
   let reloading = false
+
+  function showReloadToast(text: string, key = 'segment-refresh') {
+    showToast(text, {
+      key,
+      duration: 6000,
+      autoHide: true,
+      action: { label: '刷新', onClick: () => location.reload() },
+    })
+  }
   // 匹配序号：每重置一次就 +1，异步链路在每个 await 之后核对。
   // 换视频/换集时上一轮的网络请求可能晚一步才回来，不拦住它就会把
   // 上一个视频的番名、集数、弹幕写进新页面——表现就是「换了视频还是
@@ -1611,8 +1621,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       reloading = false
       if (method) {
         reloadHint = ''
-      } else if (hadCachedRequest) {
+      } else if (hadCachedRequest && !isStaleSegment()) {
         reloadHint = '本段已缓存，刷新生效'
+        showReloadToast('当前分段已缓存，刷新页面后生效')
       } else {
         reloadHint = ''
       }
@@ -1737,7 +1748,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         notice =
           error instanceof MatchError
             ? error.message
-            : `匹配失败：${(error as Error)?.message || error}`
+            : `匹配失败：${errorMessage(error)}`
         if (error instanceof MatchError) {
           tried = error.context.tried
           candidateList = error.context.animes.slice(0, 8)
@@ -1818,9 +1829,9 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     } catch (error) {
       if (!isCurrentMatch(seq)) return
       busy = false
-      notice = `读取集数失败：${(error as Error)?.message || error}`
+      notice = `读取集数失败：${errorMessage(error)}`
       anime = undefined
-      settleForced(`读取集数失败：${(error as Error)?.message || error}`)
+      settleForced(`读取集数失败：${errorMessage(error)}`)
       render()
     }
   }
@@ -1883,10 +1894,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
           key: 'title',
           duration: 4000,
         })
-        showToast('已注入的分段仍是原集数，刷新页面后生效', {
-          key: 'hold',
-          duration: 8000,
-        })
+        showReloadToast('已注入的分段仍是原集数，刷新页面后生效', 'hold')
       } else {
         // 匹配成功：左下角弹番剧名 + 条数，不用开面板也知道选对了哪部、有多少条。
         // 条数把已挂上的 URL 来源也算进去，那才是「整集一共有多少条三方弹幕」。
@@ -1899,7 +1907,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     } catch (error) {
       if (!isCurrentMatch(seq)) return
       busy = false
-      notice = `加载弹幕失败：${(error as Error)?.message || error}`
+      notice = `加载弹幕失败：${errorMessage(error)}`
       render()
     }
   }
@@ -1950,7 +1958,7 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
       if (!isCurrentMatch(seq)) return
       busy = false
       setExpecting(false)
-      notice = `搜索失败：${(error as Error)?.message || error}`
+      notice = `搜索失败：${errorMessage(error)}`
       render()
     }
   }
@@ -1980,19 +1988,14 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
         urlSourceNeedsRefresh = true
         const total = availableTotal()
         showToast(urlSourceNotice, { key: 'url-source-count', duration: 4000 })
-        showToast(
+        showReloadToast(
           total ? `共 ${total} 条，刷新页面后当前段生效` : '刷新页面后当前段生效',
-          {
-            key: 'url-source-refresh',
-            duration: 6000,
-            autoHide: true,
-            action: { label: '刷新', onClick: () => location.reload() },
-          }
+          'url-source-refresh'
         )
       }
       applyUrlFallback()
     } catch (error) {
-      urlTip.textContent = `添加失败：${(error as Error)?.message || error}`
+      urlTip.textContent = `添加失败：${errorMessage(error)}`
       urlTip.classList.add('is-error')
     } finally {
       adding = false

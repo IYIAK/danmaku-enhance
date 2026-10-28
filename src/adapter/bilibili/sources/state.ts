@@ -7,6 +7,7 @@
 import { loadSources, saveSources, storageSourceOffset } from '../store'
 import { findSource } from './index'
 import type { DanmakuItem, SourceEpisode, UrlSource } from './index'
+import { errorMessage } from '../error'
 
 export interface UrlSourceEntry {
   /** 唯一 id，用于删除/更新 */
@@ -180,7 +181,7 @@ async function loadEntry(
   } catch (error) {
     if (expectedGeneration !== pageGeneration || loadSeq.get(entry.key) !== mine) return
     entry.items = []
-    entry.error = (error as Error)?.message || String(error)
+    entry.error = errorMessage(error)
     entry.progress = ''
   } finally {
     if (expectedGeneration === pageGeneration && loadSeq.get(entry.key) === mine) {

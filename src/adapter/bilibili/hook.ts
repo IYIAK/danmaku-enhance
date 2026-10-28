@@ -4,6 +4,7 @@ import type { FilterConfig, FilterTarget } from './filters'
 import { decodeReply, rebuildReply, replaceElemText } from './proto'
 import type { InjectElem } from './proto'
 import { collectItems } from './sources/state'
+import { errorMessage } from './error'
 
 /**
  * B 站播放器通过 XHR 请求 /x/v2/dm/(wbi/)web/seg.so 获取弹幕分段，
@@ -638,7 +639,7 @@ function buildInjections(
   try {
     fromUrls = collectItems()
   } catch (error) {
-    return detail(`读取 URL 源失败：${(error as Error)?.message || error}`)
+    return detail(`读取 URL 源失败：${errorMessage(error)}`)
   }
   const candidates = [...fromComments, ...fromUrls]
   // 合并要求按时间有序，两路来源各自有序但拼起来不一定
@@ -887,7 +888,7 @@ function mergeResponse(
     const merged = buildInjections(request, bytes)
     if (merged) result = toArrayBuffer(merged)
   } catch (error) {
-    const msg = (error as Error)?.message || String(error)
+    const msg = errorMessage(error)
     state.stats.lastDetail = `合并异常：${msg}`
     console.warn('[danmaku-enhance] 合并弹幕失败', error)
   }
@@ -1268,9 +1269,7 @@ function patchXHR(target?: any): boolean {
       try {
         bytes = await fetchSegBytes(url)
       } catch (error) {
-        state.stats.lastDetail = `自行拉取失败退回原生：${
-          (error as Error)?.message || error
-        }`
+        state.stats.lastDetail = `自行拉取失败退回原生：${errorMessage(error)}`
       }
 
       if (xhr.__kdAborted) {
@@ -1282,9 +1281,7 @@ function patchXHR(target?: any): boolean {
         try {
           originalSend.call(xhr, body as any)
         } catch (error) {
-          state.stats.lastDetail = `退回原生发送失败：${
-            (error as Error)?.message || error
-          }`
+          state.stats.lastDetail = `退回原生发送失败：${errorMessage(error)}`
         }
         return
       }
@@ -1297,7 +1294,7 @@ function patchXHR(target?: any): boolean {
         const injected = buildInjections(request, bytes)
         if (injected) merged = injected
       } catch (error) {
-        state.stats.lastDetail = `合并异常：${(error as Error)?.message || error}`
+        state.stats.lastDetail = `合并异常：${errorMessage(error)}`
       }
 
       writeResponse(xhr, merged, url)
@@ -1385,7 +1382,7 @@ function patchFetch(target: any) {
           headers,
         })
       } catch (error) {
-        const msg = (error as Error)?.message || String(error)
+        const msg = errorMessage(error)
         state.stats.lastDetail = `合并 fetch 弹幕异常：${msg}`
         console.warn('[danmaku-enhance] 合并 fetch 弹幕失败', error)
         return response
