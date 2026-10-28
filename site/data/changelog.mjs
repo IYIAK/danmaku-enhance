@@ -9,9 +9,23 @@
 
 export const RELEASES = [
   {
-    version: '2.0.24',
+    version: '2.0.25',
     date: '2026-10-29',
     latest: true,
+    summary: '避免手动添加 URL 弹幕源时重复显示匹配成功提示。',
+    groups: [
+      {
+        name: '优化',
+        items: [
+          '**URL 弹幕源提示**：播放中手动添加 URL 来源时，不再重复刷新原来的“匹配成功”Toast，只保留 URL 加载数量和当前段刷新提示',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2.0.24',
+    date: '2026-10-29',
+    latest: false,
     summary: '统一 B站弹幕刷新提示，并修复错误日志显示。',
     groups: [
       {

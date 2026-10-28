@@ -2062,10 +2062,6 @@ export function mountPanel(info: BiliPageInfo): PanelHandle {
     const count = availableTotal()
     if (count <= announcedMatch.count) return
     announcedMatch.count = count
-    showToast(`匹配成功，已加载 ${count} 条第三方弹幕`, {
-      key: 'count',
-      duration: 4000,
-    })
   }
   // 播放器切全屏/宽屏会重建控制条，按钮被丢掉就重新挂回去。
   // 面板本身的位置不再跟着 DOM 变动走——那会让它在滚动时乱跳。
