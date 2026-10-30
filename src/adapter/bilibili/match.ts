@@ -249,6 +249,13 @@ export function splitCompoundTitle(
   }
 
   series = series.trim()
+  // 「【4K超清/第4话】番名」把集数放在画质前缀中，标记前的内容
+  // 清洗后为空，并不是番名。此时保留同一个集数，改取标记后的正文。
+  // 只有前半段没有有效番名才回退，避免把「【番名】第4话 集标题」
+  // 中真正的番名误换成集标题。
+  if (!cleanTitle(series)) {
+    series = cleanTitle(title.slice(last.end))
+  }
   if (!series) return undefined
   return { seriesName: series, episode: last.episode }
 }

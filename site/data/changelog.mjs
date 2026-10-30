@@ -9,9 +9,23 @@
 
 export const RELEASES = [
   {
-    version: '2.0.25',
+    version: '2.0.26',
     date: '2026-10-29',
     latest: true,
+    summary: '修复画质标签和集数写在标题前面时无法识别番名的问题。',
+    groups: [
+      {
+        name: '修复',
+        items: [
+          '**标题识别**：支持「【4K超清/第4话】番名」这类格式，集数标记前只有画质前缀时会从后面的正文提取番名',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2.0.25',
+    date: '2026-10-29',
+    latest: false,
     summary: '避免手动添加 URL 弹幕源时重复显示匹配成功提示。',
     groups: [
       {
