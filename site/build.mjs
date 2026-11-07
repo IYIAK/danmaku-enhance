@@ -493,6 +493,19 @@ async function main() {
     }
   }
 
+  // 「最新」标记必须唯一，且只能落在最新版本上；否则页面上会出现多个徽标
+  const latestReleases = RELEASES.filter((release) => release.latest)
+  if (latestReleases.length !== 1) {
+    problems.push(
+      `changelog.mjs: latest 标记应恰好有 1 条，实际 ${latestReleases.length} 条` +
+        (latestReleases.length ? `（${latestReleases.map((r) => r.version).join('、')}）` : '')
+    )
+  } else if (latestReleases[0] !== RELEASES[0]) {
+    problems.push(
+      `changelog.mjs: latest 应标记最新版本 ${RELEASES[0].version}，实际标在 ${latestReleases[0].version}`
+    )
+  }
+
   if (problems.length) {
     console.error('构建失败，未写入产物：')
     for (const problem of problems) console.error('  - ' + problem)

@@ -164,7 +164,7 @@ export const RELEASES = [
   {
     version: '2.0.17',
     date: '2026-10-24',
-    latest: true,
+    latest: false,
     summary:
       '控制条上的注入图标改成和原生按钮同一套结构与样式：常规窗口、宽屏、全屏都不再偏高，也不会再贴到盒子左边；页面刚打开时那个铺满播放器的巨大图标也修掉了；播放器全屏后也能打开设置面板了。',
     groups: [
