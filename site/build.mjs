@@ -21,7 +21,7 @@ const SRC = join(here, 'src')
 
 const SITE = {
   name: 'Danmaku Enhance',
-  tagline: '把弹弹play的弹幕送进哔哩哔哩原生播放器',
+  tagline: '让哔哩哔哩的弹幕，多几个来源',
   repo: 'https://github.com/IYIAK/danmaku-enhance',
   script: './index.user.js',
   version: RELEASES[0].version,
@@ -203,7 +203,8 @@ function homePage() {
       <span class="eyebrow"><span class="dot"></span>v${esc(SITE.version)} · 支持哔哩哔哩</span>
       <h1>${esc(SITE.tagline)}</h1>
       <p class="lede">
-        在哔哩哔哩看动画时，把弹弹play、其他 UP 主投稿与巴哈姆特动画疯的弹幕一并合进来。播放器、画质与弹幕设置都保持原生，只是弹幕更多了。看哪个投稿、看哪份弹幕，从此不必绑在一起。
+        在哔哩哔哩看动画时，把弹弹play、其他 UP 主投稿与巴哈姆特动画疯的弹幕一并合进来。<br>
+        播放器、画质与弹幕设置都保持原生，只是弹幕更多了。看哪个投稿、看哪份弹幕，从此不必绑在一起。
       </p>
       <div class="actions">
         <a class="btn btn--primary" href="${SITE.script}">安装脚本</a>
