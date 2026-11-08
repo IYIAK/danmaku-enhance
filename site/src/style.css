@@ -252,7 +252,7 @@ code {
 }
 
 .hero p.lede {
-  max-width: 640px;
+  max-width: 780px;
   margin: 0 0 32px;
   color: var(--muted);
   font-size: 16px;
@@ -367,19 +367,6 @@ code {
 /* 首屏那张要往上提一点，和按钮拉开层次 */
 .shot--wide {
   margin-top: 48px;
-}
-
-/* ── 痛点 ──────────────────────────────────────────────── */
-
-.punch {
-  margin: 20px 0 0;
-  padding: 16px 20px;
-  border: 1px solid rgba(251, 114, 153, 0.35);
-  border-radius: var(--radius);
-  background: var(--accent-dim);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
 }
 
 /* ── 卡片网格 ──────────────────────────────────────────── */

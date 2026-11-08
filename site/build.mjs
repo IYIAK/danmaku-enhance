@@ -203,9 +203,7 @@ function homePage() {
       <span class="eyebrow"><span class="dot"></span>v${esc(SITE.version)} · 支持哔哩哔哩</span>
       <h1>${esc(SITE.tagline)}</h1>
       <p class="lede">
-        它不替换播放器，而是接管弹幕分段请求，将弹弹play、哔哩哔哩其他投稿与巴哈姆特动画疯的弹幕
-        合并到当前视频的弹幕流中。注入的弹幕在数据结构层面就是原生弹幕，字号、透明度、速度与屏蔽
-        规则全部沿用哔哩哔哩自身设置。
+        在哔哩哔哩看动画时，把弹弹play、其他 UP 主投稿与巴哈姆特动画疯的弹幕一并合进来。播放器、画质与弹幕设置都保持原生，只是弹幕更多了。看哪个投稿、看哪份弹幕，从此不必绑在一起。
       </p>
       <div class="actions">
         <a class="btn btn--primary" href="${SITE.script}">安装脚本</a>
@@ -217,26 +215,6 @@ function homePage() {
         <img src="./img/player.jpg" alt="全屏播放哔哩哔哩视频时，第三方弹幕面板展开在播放器右侧，画面里同时跑着原生弹幕和注入弹幕" decoding="async">
         <figcaption>真实运行截图：哔哩哔哩原生播放器、原生控制条与原生弹幕设置均未改动，右侧为脚本附加的面板，左下角为注入结果提示</figcaption>
       </figure>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap">
-      <div class="section-head">
-        <h2>它解决什么</h2>
-        <p>弹幕通常与视频绑定：观看位置决定了可用的弹幕来源。</p>
-      </div>
-      <div class="grid">
-        <article class="card">
-          <h3>弹幕最多的投稿未必最好看</h3>
-          <p>同一部作品常有多个投稿，弹幕量与翻译、画质往往不在一处；弹幕最多的那个未必就是你想看的版本。</p>
-        </article>
-        <article class="card">
-          <h3>哔哩哔哩弹幕分散于多个投稿</h3>
-          <p>同一部动画常有多个 UP 主投稿，观众与弹幕因此分散；弹幕数量最多的投稿，未必是翻译与画质最好的版本。</p>
-        </article>
-      </div>
-      <p class="punch">本脚本将「在哪看」与「看哪份弹幕」解耦：留在哔哩哔哩观看，弹幕可从弹弹play、其他投稿与巴哈姆特动画疯引入。</p>
     </div>
   </section>
 
