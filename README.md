@@ -1,12 +1,14 @@
 # Danmaku Enhance
 
-> 基于 [agefans enhance](https://github.com/IronKinoko/agefans-enhance) 的 fork。
-> 保留上游「替换站点播放器」的能力，并额外实现一项功能：**将第三方弹幕注入哔哩哔哩原生播放器**。
+> 把弹弹play、哔哩哔哩 URL 源与巴哈姆特动画疯的弹幕，合并进哔哩哔哩原生弹幕流。
 
-弹幕存于弹弹play，播放器习惯用哔哩哔哩。本项目将两者结合：不替换播放器、不安装额外插件、
+弹幕存于弹弹play，播放器习惯用哔哩哔哩。本项目将两者结合：**不替换播放器**、不安装额外插件、
 不修改哔哩哔哩的任何设置，开启开关后，当前视频的弹幕流中即包含第三方弹幕。
 
-## 哔哩哔哩：实现方式
+注入的弹幕在数据结构层面就是原生弹幕，因此字号、透明度、速度、屏蔽词与轨道分配
+全部沿用哔哩哔哩自身设置，不存在两套弹幕观感不一致的问题。
+
+## 实现方式
 
 URL 弹幕源恢复与弹弹play匹配并行进行，播放器放行前等待两路数据汇合：
 
@@ -75,8 +77,6 @@ GET api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid=<cid>&segment_index=<n>
 
 ## 功能
 
-### 哔哩哔哩
-
 - **弹幕混流**：将弹弹play的弹幕并入哔哩哔哩原生弹幕流，播放器不作改动
 - **多源并存**：弹弹play、哔哩哔哩链接、巴哈姆特动画疯链接可同时挂载，URL 源最多 3 条
 - **标题自动匹配**：对标题逐级清洗，依次尝试多组关键词，并以最长公共子串剔除无关结果；
@@ -89,35 +89,9 @@ GET api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid=<cid>&segment_index=<n>
 - **面板内嵌于控制条**：控制条右侧提供入口图标，点击展开；点击面板外部或再次点击图标即收起
 - **按 cid 记忆**：匹配结果、URL 源与偏移量按视频保存，下次打开保持一致
 
-### 其它站点
+## 支持范围
 
-替换站点自带播放器，提供完整播放能力：
-
-- 弹幕
-- 画中画
-- 自动换集、无缝换集
-- 快捷键体系，支持自定义
-- 调整播放器外边框，适配视频比例
-- 记录播放位置，自动续播
-- 按 <kbd>?</kbd> 键调出脚本信息窗口，查看**视频信息**与**快捷键**
-- 多站点适配，可搜索相同视频资源与种子
-
-## 支持的网站
-
-| 站点 | 处理方式 |
-| --- | --- |
-| [哔哩哔哩](https://www.bilibili.com) | 不替换播放器，将第三方弹幕合并进原生弹幕流 |
-| [agefans](http://www.age.tv) | 替换播放器 |
-| [bimiacg](http://www.bimiacg14.net) | 替换播放器 |
-| [次元城](https://www.cycani.org) | 替换播放器 |
-| [稀饭动漫](https://next.xifanacg.com) | 替换播放器 |
-| [Anime1](https://anime1.me) | 替换播放器 |
-| [咕咕番](https://www.gugu3.com) | 替换播放器 |
-| [girigiri 爱](https://anime.girigirilove.com/) | 替换播放器 |
-| [吐槽弹幕网](https://www.tucao.my/) | 替换播放器 |
-| [独立播放器](https://ironkinoko.github.io/agefans-enhance/) | 替换播放器 |
-
-哔哩哔哩侧仅处理视频页与番剧／影视播放页，**直播页直接跳过**（直播不提供分段弹幕接口）。
+仅哔哩哔哩，处理视频页与番剧／影视播放页。**直播页直接跳过**（直播不提供分段弹幕接口）。
 
 ## 安装
 
@@ -126,7 +100,7 @@ GET api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid=<cid>&segment_index=<n>
 
 推送 `master` 后由 GitHub Actions 自动构建并发布至 `gh-pages` 分支，上述地址始终为最新构建。
 
-## 哔哩哔哩使用方法
+## 使用方法
 
 0. 打开任意视频，点击控制条右侧的弹幕图标，开启面板中的「启用注入」开关
 1. 面板按当前标题自动匹配番剧；结果不准确时可手动检索，或直接将视频链接填入 URL 弹幕源
@@ -150,31 +124,23 @@ GET api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid=<cid>&segment_index=<n>
 **是否支持直播？**
 不支持。直播页不提供分段弹幕接口，脚本会直接跳过。
 
-**是否会影响 agefans 原有站点的功能？**
-不影响。哔哩哔哩走独立适配层，仅接管弹幕分段请求与面板，原有播放器替换逻辑未作改动。
-
 ## 权限声明
 
 | 权限 | 用途 |
 | --- | --- |
 | `GM_xmlhttpRequest` | 请求弹幕接口。仅访问 **dandanplay.net**、**api.bilibili.com**、**ani.gamer.com.tw** |
-| `GM_getValue` / `GM_setValue` | 保存播放器配置、匹配结果、URL 弹幕源与偏移量 |
+| `GM_getValue` / `GM_setValue` / `GM_deleteValue` | 保存匹配结果、URL 弹幕源、偏移量、过滤器与白名单 |
 | `GM_info` | 在面板中显示当前运行的脚本版本 |
 | `GM_registerMenuCommand` | 注册脚本菜单项 |
-| `@include` | 匹配上述列出的站点 |
+| `@match` | 仅匹配 bilibili.com |
 
 跨域白名单固定写在 `meta.template` 的 `@connect` 中，亦可在 Tampermonkey 的
 「设置 → XHR 安全」中逐条管理。全部数据仅存于本地，不上传至任何服务器。
 
 ## 版本号规则
 
-本项目自 fork 起点（上游基线 1.60.3）重新计数：
-
-- `2.0.0` = 「哔哩哔哩弹幕注入」达到日常可用状态
-- 此后**修复与收尾递增修订号**（`2.0.11`、`2.0.12`）
+- **修复与收尾递增修订号**（`2.0.11`、`2.0.12`）
 - **新功能递增次版本号**（`2.1.0`、`2.2.0`）
-
-早期 `1.60.4`～`1.60.9` 为沿用上游主次号的临时编号，已按新规则对应。
 
 ## 开发
 
@@ -183,40 +149,40 @@ pnpm install
 pnpm dev      # 监听构建（bocchi）
 pnpm build    # 产出 dist/index.user.js
 pnpm lint     # tsc --noEmit
+pnpm check:case  # 跨平台路径大小写检查
 ```
 
 源码结构：
 
 ```
 src/
-├── index.ts              # 入口：样式 + 适配层 + runtime.run()
-├── runtime/              # 站点注册、SPA 路由、单例运行时
-├── player/               # KPlayer（基于 Plyr）与插件：弹幕、快捷键、自动换集
-├── adapter/
-│   ├── <站点>/           # 各站点适配器
-│   └── bilibili/         # 哔哩哔哩注入：见下
-└── utils/                # 存储、请求、UI 小工具
+├── index.ts              # 入口
+└── adapter/bilibili/     # 哔哩哔哩弹幕注入（本项目的全部代码）
+    ├── hook.ts           # 接管 XHR/fetch，把第三方弹幕合并进分段响应
+    ├── proto.ts          # 最小 protobuf 编解码（仅改动所需字段，其余原样搬运）
+    ├── match.ts          # 标题清洗、候选关键词、番剧与集数匹配
+    ├── info.ts           # 从页面状态读取当前视频的标题、cid 与集数
+    ├── panel.ts          # 控制条按钮与弹出面板
+    ├── filters.ts        # 弹幕过滤器（对原生与注入弹幕同时生效）
+    ├── store.ts          # 配置与 URL 源的持久化
+    ├── toast.ts          # 左下角提示
+    ├── overlay.ts        # 全屏浮层宿主
+    ├── error.ts          # 错误信息归一
+    ├── sources/          # URL 弹幕源：哔哩哔哩、巴哈姆特动画疯
+    └── lib/              # 自包含的基础设施
+        ├── storage.ts    # GM / localStorage 双写存储
+        ├── request.ts    # GM_xmlhttpRequest 封装
+        ├── dandanplay.ts # 弹弹play 接口
+        ├── remember.ts   # 番剧/集数匹配记忆
+        └── site-runner.ts# 页面识别与 SPA 路由
 ```
-
-`src/adapter/bilibili/` 各文件职责：
-
-| 文件 | 职责 |
-| --- | --- |
-| `hook.ts` | 接管 XHR/fetch，将第三方弹幕合并进分段响应 |
-| `proto.ts` | 最小 protobuf 编解码（仅处理所需字段，其余原样搬运） |
-| `match.ts` | 标题清洗、候选关键词、番剧与集数匹配 |
-| `info.ts` | 从页面状态读取当前视频的标题、cid 与集数 |
-| `panel.ts` | 控制条按钮与弹出面板 |
-| `sources/` | URL 弹幕源：哔哩哔哩、巴哈姆特动画疯 |
-| `filters.ts` | 弹幕过滤器（对原生与注入弹幕同时生效） |
-| `store.ts` | 配置与 URL 源的持久化 |
 
 官网位于 `site/`（一页介绍 + 一页更新日志），纯静态、零外部依赖，构建方式见 `site/README.md`。
 
 ## 致谢与许可
 
-- 上游项目：[IronKinoko/agefans-enhance](https://github.com/IronKinoko/agefans-enhance)
 - 弹幕服务：[弹弹play](https://www.dandanplay.com/)
-- 弹幕渲染库：[@ironkinoko/danmaku](https://github.com/IronKinoko/danmaku)
+- 早期代码源自 [IronKinoko/agefans-enhance](https://github.com/IronKinoko/agefans-enhance)，
+  现已演化为独立的哔哩哔哩弹幕注入脚本，不再包含其播放器替换功能
 
 MIT License，见 [LICENSE](./LICENSE)。

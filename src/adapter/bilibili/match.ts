@@ -9,17 +9,20 @@ import {
   getComments,
   queryAnimes,
   queryEpisodes,
-} from '../../player/plugins/danmaku/apis'
-import type { Anime, Comment, Episode } from '../../player/plugins/danmaku/types'
-import {
-  storageAnimeName,
-  storageEpisodeName,
-} from '../../player/plugins/danmaku/utils'
+} from './lib/dandanplay'
+import type {
+  Anime,
+  DanmakuComment,
+  Episode,
+} from './lib/dandanplay'
+import { storageAnimeName, storageEpisodeName } from './lib/remember'
 import type { BiliPageInfo } from './info'
 import { errorMessage } from './error'
 
 export type AnimeItem = Anime
 export type EpisodeItem = Episode
+/** 弹幕条目（与播放器的 Comment 结构一致） */
+export type Comment = DanmakuComment
 
 /** 生成候选关键词时最多发几个搜索请求 */
 const MAX_KEYWORD_TRIES = 12

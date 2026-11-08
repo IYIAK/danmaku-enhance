@@ -11,7 +11,7 @@
  * 弹幕走的是同一套规则：原生弹幕在重建响应时按同样的条件被剔除，
  * 所以「屏蔽词」「屏蔽顶部」这类开关对画面上的所有弹幕一视同仁。
  */
-import { gm } from '../../utils/storage'
+import { gm } from './lib/storage'
 
 const FILTER_KEY = 'bilibili-danmaku-filter-v1'
 

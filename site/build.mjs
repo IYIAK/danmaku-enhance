@@ -23,7 +23,6 @@ const SITE = {
   name: 'Danmaku Enhance',
   tagline: '把弹弹play的弹幕送进哔哩哔哩原生播放器',
   repo: 'https://github.com/IYIAK/danmaku-enhance',
-  upstream: 'https://github.com/IronKinoko/agefans-enhance',
   script: './index.user.js',
   version: RELEASES[0].version,
 }
@@ -88,7 +87,7 @@ function layout({ title, description, page, body }) {
 ${body}
 <footer class="site-footer">
   <div class="wrap">
-    <span>${esc(SITE.name)} · 基于 <a href="${SITE.upstream}" rel="noopener">agefans enhance</a> 的 fork</span>
+    <span>${esc(SITE.name)} · 把第三方弹幕并入哔哩哔哩原生弹幕流</span>
     <span><a href="${SITE.repo}" rel="noopener">GitHub 仓库</a></span>
   </div>
 </footer>
@@ -188,8 +187,8 @@ function homePage() {
       a: `<p>不支持。直播页面不提供分段弹幕接口，脚本会跳过。</p>`,
     },
     {
-      q: '是否影响 agefans 原有站点的功能？',
-      a: `<p>不影响。哔哩哔哩走独立适配层，仅接管弹幕分段请求与面板，原播放器替换逻辑未作改动。</p>`,
+      q: '是否会与哔哩哔哩原生弹幕重复？',
+      a: `<p>默认启用「与原生去重」：比对时忽略空白、标点、全角半角与大小写，与原生弹幕时间差 ±1.5 秒、注入弹幕之间 ±1.8 秒均视为重复。如需两侧同时显示，可关闭该选项。</p>`,
     },
     {
       q: '如何确认运行的是最新版本？',
@@ -204,8 +203,9 @@ function homePage() {
       <span class="eyebrow"><span class="dot"></span>v${esc(SITE.version)} · 支持哔哩哔哩</span>
       <h1>${esc(SITE.tagline)}</h1>
       <p class="lede">
-        本项目是 agefans enhance 的 fork。它不替换播放器，而是接管弹幕分段请求，
-        将弹弹play、哔哩哔哩其他投稿与巴哈姆特动画疯的弹幕合并到当前视频的弹幕流中。
+        它不替换播放器，而是接管弹幕分段请求，将弹弹play、哔哩哔哩其他投稿与巴哈姆特动画疯的弹幕
+        合并到当前视频的弹幕流中。注入的弹幕在数据结构层面就是原生弹幕，字号、透明度、速度与屏蔽
+        规则全部沿用哔哩哔哩自身设置。
       </p>
       <div class="actions">
         <a class="btn btn--primary" href="${SITE.script}">安装脚本</a>
@@ -228,8 +228,8 @@ function homePage() {
       </div>
       <div class="grid">
         <article class="card">
-          <h3>小站播放依赖网络状况</h3>
-          <p>agefans enhance 覆盖的小型动漫站点受网络条件影响明显，高峰时段缓冲频繁；哔哩哔哩的 CDN 与画质表现更稳定。</p>
+          <h3>弹幕最多的投稿未必最好看</h3>
+          <p>同一部作品常有多个投稿，弹幕量与翻译、画质往往不在一处；弹幕最多的那个未必就是你想看的版本。</p>
         </article>
         <article class="card">
           <h3>哔哩哔哩弹幕分散于多个投稿</h3>
@@ -324,7 +324,7 @@ function homePage() {
   return layout({
     title: `${SITE.name} · ${SITE.tagline}`,
     description:
-      '基于 agefans enhance 的用户脚本，将弹弹play、哔哩哔哩与巴哈姆特动画疯的弹幕并入哔哩哔哩原生播放器，不替换播放器。',
+      '将弹弹play、哔哩哔哩其他投稿与巴哈姆特动画疯的弹幕并入哔哩哔哩原生播放器，不替换播放器。',
     page: 'home',
     body,
   })
@@ -447,9 +447,8 @@ async function main() {
       .filter(
         (url) =>
           /^https?:\/\//i.test(url) &&
-          // 页脚那几个是给人点的超链接，不是资源加载，允许
-          !url.startsWith(SITE.repo) &&
-          !url.startsWith(SITE.upstream)
+          // 页脚那个 GitHub 链接是给人点的超链接，不是资源加载，允许
+          !url.startsWith(SITE.repo)
       )
     if (external.length) {
       problems.push(`${name}: 存在外部资源请求 ${external.join(', ')}`)

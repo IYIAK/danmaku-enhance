@@ -1,4 +1,4 @@
-import type { Comment } from '../../player/plugins/danmaku/types'
+import type { Comment } from './match'
 import { applyDensity, createBlockChecker, isSimilar, loadFilter } from './filters'
 import type { FilterConfig, FilterTarget } from './filters'
 import { decodeReply, rebuildReply, replaceElemText } from './proto'

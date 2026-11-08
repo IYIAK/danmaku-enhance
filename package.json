@@ -1,7 +1,7 @@
 {
   "name": "danmaku-enhance",
-  "version": "2.0.26",
-  "description": "增强播放功能，实现自动换集、无缝换集、画中画、历史记录、断点续播、弹幕等功能。适配agefans、NT动漫、bimiacg、mutefun、次元城、稀饭动漫，并给哔哩哔哩注入弹弹play 弹幕",
+  "version": "2.1.0",
+  "description": "把弹弹play、哔哩哔哩 URL 源与巴哈姆特动画疯的弹幕合并进哔哩哔哩原生播放器",
   "main": "index.user.js",
   "type": "module",
   "repository": {
@@ -9,9 +9,9 @@
     "url": "git+https://github.com/IYIAK/danmaku-enhance.git"
   },
   "keywords": [
-    "agefans",
     "bilibili",
     "danmaku",
+    "dandanplay",
     "userscript"
   ],
   "author": "IYIAK",
@@ -32,9 +32,7 @@
     "postversion": "pnpm run deploy && git push && git push --tags"
   },
   "devDependencies": {
-    "@types/jquery": "^3.5.14",
     "@types/lodash-es": "^4.17.6",
-    "@types/opencc-js": "^1.0.3",
     "@types/tampermonkey": "^5.0.5",
     "bocchi": "^2.1.0",
     "gh-pages": "^3.2.3",
@@ -45,18 +43,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "@ironkinoko/danmaku": "1.4.5",
-    "dayjs": "^1.11.21",
-    "hls.js": "1.6.15",
-    "lodash-es": "^4.17.21",
-    "opencc-js": "1.0.5",
-    "plyr": "3.6.4"
-  },
-  "globals": {
-    "hls.js": "Hls",
-    "plyr": "Plyr",
-    "@ironkinoko/danmaku": "Danmaku",
-    "opencc-js": "OpenCC"
+    "lodash-es": "^4.17.21"
   },
   "prettier": {
     "singleQuote": true,

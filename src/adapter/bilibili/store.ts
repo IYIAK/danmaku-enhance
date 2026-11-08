@@ -1,5 +1,5 @@
 /** B 站弹幕注入的本地配置与持久化 */
-import { gm } from '../../utils/storage'
+import { gm } from './lib/storage'
 
 const CONFIG_KEY = 'bilibili-danmaku-config-v2'
 /** v3 起 URL 来源按「页面」分开存，避免在别的视频上加的来源跑过来 */

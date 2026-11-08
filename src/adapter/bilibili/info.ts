@@ -422,12 +422,16 @@ function readDomInfo(): BiliPageInfo {
   const compound = splitCompoundTitle(title)
 
   // 番剧/影视页左侧的系列名
-  const $mediaTitle = $('a[class*="mediainfo_mediaTitle"]').first()
-  let seriesName = String($mediaTitle.attr('title') || '').trim()
+  const mediaTitle = document.querySelector<HTMLAnchorElement>(
+    'a[class*="mediainfo_mediaTitle"]'
+  )
+  let seriesName = String(mediaTitle?.getAttribute('title') || '').trim()
 
   if (!seriesName) {
-    const $heading = $('h1.video-title, .video-title, [class*="videoTitle"]').first()
-    seriesName = String($heading.text() || '').trim()
+    const heading = document.querySelector<HTMLElement>(
+      'h1.video-title, .video-title, [class*="videoTitle"]'
+    )
+    seriesName = String(heading?.textContent || '').trim()
   }
 
   if (!seriesName) {
